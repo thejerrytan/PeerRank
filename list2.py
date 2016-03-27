@@ -16,9 +16,15 @@ DEVELOPERS = {
 	'Linus__Torvalds' : {
 		'name' : 'Linus Torvalds',
 		'so_user' : None
+	},
+	'jonskeet' : {
+		'name' : 'Jon Skeet',
+		'so_user' : None
 	}
 }
 
+DEVELOPERS_THRES    = 100
+NAME_SEARCH_FILTER  = 10
 NAME_JARO_THRES     = 0.90
 LOC_JARO_THRES      = 0.90
 IMG_SIM_THRES       = 0.50
@@ -28,8 +34,8 @@ CONSUMER_KEY        = 'fTxnhb0nVeVfQG1a4c77FadFx'
 CONSUMER_SECRET     = 'IgRFOa8ijfFVWoa01N9mKX1cQvOTIYh4tyQrVP4o5xzdDuXGTn'
 ACCESS_TOKEN_KEY    = '918825662-3OzaE9V5KTjArMrFdnZ9vraz4ZtraVwyceoolChG'
 ACCESS_TOKEN_SECRET = 'iOXklGWNcZdJS1goVHbxCFi11Lb65nF8CnFfNVrJSNZpg'
-so_client_secret    = 'AjN*KCYPu9qFontnH1T7Fw(('
-so_client_key       = 'PlqChK)JFcqzNx23OZe30Q(('
+SO_CLIENT_SECRET    = 'AjN*KCYPu9qFontnH1T7Fw(('
+SO_CLIENT_KEY       = 'PlqChK)JFcqzNx23OZe30Q(('
 
 def paginate(iterable, page_size):
 	i1, i2 = itertools.tee(iterable)
@@ -48,7 +54,7 @@ def init():
 def get_lists(screen_name):
 	api = init()
 	lists = api.lists_memberships(screen_name=screen_name)
-	return lists[:5]
+	return lists[:20]
 
 def get_matching_so_profile(user):
 	result = []
@@ -61,8 +67,7 @@ def get_matching_so_profile(user):
 			loc_sim = 0
 		matches[i] = (u, img_sim, loc_sim)
 	matches = sorted(matches, cmp=lambda x, y: cmp(x[1], y[1]))
-	print matches
-	matches = filter(lambda x: x[1] < IMG_SIM_THRES and x[2] > LOC_JARO_THRES, matches)
+	matches = filter(lambda x: x[1] < IMG_SIM_THRES, matches)
 	return matches[0][0] if len(matches) == 1 else None
 
 def compare_location(twitter_loc, so_loc):
@@ -76,28 +81,34 @@ def compare_image(twitter_url, so_url):
 	return gis.normalized_distance(t_sig, so_sig)
 
 def compare_name_string(screen_name, name):
-	so = stackexchange.Site(stackexchange.StackOverflow, so_client_key)
+	so = stackexchange.Site(stackexchange.StackOverflow, SO_CLIENT_KEY)
 	matches = so.users_by_name(name)
 	result = []
-	if len(matches) < 10:
+	if len(matches) < NAME_SEARCH_FILTER:
 		for m in matches:
 			score = jellyfish.jaro_winkler(unicode(name), unicode(m.display_name))
 			if score > NAME_JARO_THRES:
-				print "Twitter name :" + name + "SO : " + m.display_name + " : " + str(score)
+				# print "Twitter name :" + name + "SO : " + m.display_name + " : " + str(score)
 				result.append(m)
 	return result
 
 if __name__ == "__main__":
 	api = init()
-	while len(DEVELOPERS) < 10:
+	while len(DEVELOPERS) < DEVELOPERS_THRES:
 		key = DEVELOPERS.iterkeys().next()
 		lists = get_lists(key)
 		for l in lists:
 			for member in l.members():
 				if member.screen_name not in DEVELOPERS:
+					print member.screen_name + " added"
 					DEVELOPERS[member.screen_name] = {'name' : member.name, 'so_user' : None}
 
 	for k, v in DEVELOPERS.iteritems():
 		user = api.get_user(screen_name=k)
 		so_user = get_matching_so_profile(user._json)
-
+		if so_user is not None:
+			print "Twitter : " + k + " -> " + so_user.display_name
+		TOTAL_MATCHED_ACC = TOTAL_MATCHED_ACC + 1 if so_user is not None else TOTAL_MATCHED_ACC
+		DEVELOPERS[k]['so_user'] = so_user
+	print "Total targeted Twitter accounts : %d" % len(DEVELOPERS)
+	print "Total SO accounts matched : %d" % TOTAL_MATCHED_ACC
