@@ -1,4 +1,4 @@
-import pprint, sys, tweepy, cv2, jellyfish, time
+import pprint, sys, tweepy, cv2, jellyfish, time, redis
 sys.path.append('./Py_Stackexchange')
 import stackexchange
 from skimage.transform import *
@@ -10,23 +10,23 @@ from tweepy import OAuthHandler, API, Cursor
 from urllib2 import HTTPError
 
 DEVELOPERS = {
-	# 'codinghorror' : {
-	# 	'name' : 'Jeff Atwood',
-	# 	'so_user' : None
-	# },
-	# 'Linus__Torvalds' : {
-	# 	'name' : 'Linus Torvalds',
-	# 	'so_user' : None
-	# },
+	'codinghorror' : {
+		'name' : 'Jeff Atwood',
+		'so_user' : None
+	},
+	'Linus__Torvalds' : {
+		'name' : 'Linus Torvalds',
+		'so_user' : None
+	},
 	'jonskeet' : {
 		'name' : 'Jon Skeet',
 		'so_user' : None
 	}
 }
 
-DEVELOPERS_THRES    = 100
-NAME_SEARCH_FILTER  = 20
-NAME_JARO_THRES     = 0.80
+DEVELOPERS_THRES    = 25000
+NAME_SEARCH_FILTER  = 10
+NAME_JARO_THRES     = 0.90
 LOC_JARO_THRES      = 0.90
 IMG_SIM_THRES       = 0.50
 TOTAL_MATCHED_ACC   = 0
@@ -56,7 +56,7 @@ def init():
 def get_lists(screen_name):
 	api = init()
 	lists = api.lists_memberships(screen_name=screen_name)
-	return lists[:20]
+	return lists
 
 def get_matching_so_profile(user):
 	result = []
@@ -110,6 +110,7 @@ def compare_name_string(screen_name, name):
 
 if __name__ == "__main__":
 	api = init()
+	r = redis.Redis()
 	count = 0
 	print "Name search filter              : %d" % NAME_SEARCH_FILTER
 	print "Name jaro-winkler sim threshold : %.2f" % NAME_JARO_THRES
@@ -118,6 +119,7 @@ if __name__ == "__main__":
 	print ''
 	while len(DEVELOPERS) < DEVELOPERS_THRES:
 		key = DEVELOPERS.iterkeys().next()
+		r.set(key, DEVELOPERS[key]) # insert into database
 		lists = get_lists(key)
 		for l in lists:
 			for member in l.members():
@@ -126,7 +128,9 @@ if __name__ == "__main__":
 					count += 1
 					if count % 5 == 0:
 						print ''
-					DEVELOPERS[member.screen_name] = {'name' : member.name, 'so_user' : None}
+					new_member = {'name' : member.name, 'so_user' : None}
+					DEVELOPERS[member.screen_name] = new_member
+					r.set(member.screen_name, new_member)
 	print ''
 	for k, v in DEVELOPERS.iteritems():
 		user = api.get_user(screen_name=k)
@@ -134,8 +138,10 @@ if __name__ == "__main__":
 		time.sleep(2) # Delay to prevent rate limiting from SO
 		if so_user is not None:
 			print "Twitter(" + k + ") -> StackOverflow(" + so_user.display_name + ")"
+			# Save into DB
+			r.set(k, {"name" : user.name, "twitter_user" : user._json, "so_user" : so_user.__dict__})
 		TOTAL_MATCHED_ACC = TOTAL_MATCHED_ACC + 1 if so_user is not None else TOTAL_MATCHED_ACC
-		DEVELOPERS[k]['so_user'] = so_user
+		DEVELOPERS[k]['so_user'] = so_user.__dict__ if so_user is not None else None
 	print ''
 	print "Total targeted Twitter accounts : %d" % len(DEVELOPERS)
 	print "Total SO accounts matched : %d" % TOTAL_MATCHED_ACC
