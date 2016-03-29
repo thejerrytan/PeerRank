@@ -6,6 +6,7 @@ lxml==2.3
 numpy==1.10.4
 oauthlib==1.0.3
 py2neo==2.0.8
+tweepy==3.5.0
 pygithub3==0.5.1
 requests==2.9.1
 requests-oauthlib==0.6.1

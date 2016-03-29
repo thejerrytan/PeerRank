@@ -14,18 +14,18 @@ DEVELOPERS = {
 	# 	'name' : 'Jeff Atwood',
 	# 	'so_user' : None
 	# },
-	'Linus__Torvalds' : {
-		'name' : 'Linus Torvalds',
-		'so_user' : None
-	},
-	# 'jonskeet' : {
-	# 	'name' : 'Jon Skeet',
+	# 'Linus__Torvalds' : {
+	# 	'name' : 'Linus Torvalds',
 	# 	'so_user' : None
-	# }
+	# },
+	'jonskeet' : {
+		'name' : 'Jon Skeet',
+		'so_user' : None
+	}
 }
 
 DEVELOPERS_THRES    = 100
-NAME_SEARCH_FILTER  = 10
+NAME_SEARCH_FILTER  = 20
 NAME_JARO_THRES     = 0.80
 LOC_JARO_THRES      = 0.90
 IMG_SIM_THRES       = 0.50
@@ -35,8 +35,9 @@ CONSUMER_KEY        = 'fTxnhb0nVeVfQG1a4c77FadFx'
 CONSUMER_SECRET     = 'IgRFOa8ijfFVWoa01N9mKX1cQvOTIYh4tyQrVP4o5xzdDuXGTn'
 ACCESS_TOKEN_KEY    = '918825662-3OzaE9V5KTjArMrFdnZ9vraz4ZtraVwyceoolChG'
 ACCESS_TOKEN_SECRET = 'iOXklGWNcZdJS1goVHbxCFi11Lb65nF8CnFfNVrJSNZpg'
-SO_CLIENT_SECRET    = 'AjN*KCYPu9qFontnH1T7Fw(('
-SO_CLIENT_KEY       = 'PlqChK)JFcqzNx23OZe30Q(('
+# SO_CLIENT_SECRET  = 'AjN*KCYPu9qFontnH1T7Fw(('
+# SO_CLIENT_KEY     = 'PlqChK)JFcqzNx23OZe30Q(('
+SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version 
 
 def paginate(iterable, page_size):
 	i1, i2 = itertools.tee(iterable)
@@ -113,7 +114,7 @@ if __name__ == "__main__":
 	print "Name search filter              : %d" % NAME_SEARCH_FILTER
 	print "Name jaro-winkler sim threshold : %.2f" % NAME_JARO_THRES
 	print "Image similarity threshold      : %.2f" % IMG_SIM_THRES
-	print "Getting Twitter developers starting with : Linus__Torvalds"
+	print "Getting Twitter developers starting with : jonskeet"
 	print ''
 	while len(DEVELOPERS) < DEVELOPERS_THRES:
 		key = DEVELOPERS.iterkeys().next()
@@ -130,7 +131,7 @@ if __name__ == "__main__":
 	for k, v in DEVELOPERS.iteritems():
 		user = api.get_user(screen_name=k)
 		so_user = get_matching_so_profile(user._json)
-		time.sleep(5) # Delay to prevent rate limiting from SO
+		time.sleep(2) # Delay to prevent rate limiting from SO
 		if so_user is not None:
 			print "Twitter(" + k + ") -> StackOverflow(" + so_user.display_name + ")"
 		TOTAL_MATCHED_ACC = TOTAL_MATCHED_ACC + 1 if so_user is not None else TOTAL_MATCHED_ACC
