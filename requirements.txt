@@ -1,3 +1,6 @@
+redis==2.10.5
+scrappy==0.3.0
+image_match
 jellyfish==0.5.2
 lxml==2.3
 numpy==1.10.4
