@@ -1,5 +1,5 @@
 import pprint, sys, tweepy, cv2, jellyfish, time, redis
-sys.path.append('./Py_Stackexchange')
+sys.path.append('./Py-StackExchange')
 import stackexchange
 from skimage.transform import *
 from skimage.io import *
@@ -10,14 +10,14 @@ from tweepy import OAuthHandler, API, Cursor
 from urllib2 import HTTPError
 
 DEVELOPERS = {
-	'codinghorror' : {
-		'name' : 'Jeff Atwood',
-		'so_user' : None
-	},
-	'Linus__Torvalds' : {
-		'name' : 'Linus Torvalds',
-		'so_user' : None
-	},
+	# 'codinghorror' : {
+	# 	'name' : 'Jeff Atwood',
+	# 	'so_user' : None
+	# },
+	# 'Linus__Torvalds' : {
+	# 	'name' : 'Linus Torvalds',
+	# 	'so_user' : None
+	# },
 	'jonskeet' : {
 		'name' : 'Jon Skeet',
 		'so_user' : None
@@ -26,7 +26,7 @@ DEVELOPERS = {
 
 DEVELOPERS_THRES    = 25000
 NAME_SEARCH_FILTER  = 10
-NAME_JARO_THRES     = 0.90
+NAME_JARO_THRES     = 0.80
 LOC_JARO_THRES      = 0.90
 IMG_SIM_THRES       = 0.50
 TOTAL_MATCHED_ACC   = 0
@@ -133,7 +133,11 @@ if __name__ == "__main__":
 					r.set(member.screen_name, new_member)
 	print ''
 	for k, v in DEVELOPERS.iteritems():
-		user = api.get_user(screen_name=k)
+		try:
+			user = api.get_user(screen_name=k)
+		except TweepError as e:
+			print e
+			continue
 		so_user = get_matching_so_profile(user._json)
 		time.sleep(2) # Delay to prevent rate limiting from SO
 		if so_user is not None:
