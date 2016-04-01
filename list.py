@@ -4,6 +4,7 @@
 import pprint, sys, tweepy, cv2, jellyfish, time, redis, json
 sys.path.append('./Py-StackExchange')
 import stackexchange
+from util import *
 from skimage.transform import *
 from skimage.io import *
 from image_match.goldberg import ImageSignature
@@ -11,27 +12,32 @@ from image_match.goldberg import ImageSignature
 from tweepy.error import TweepError
 from tweepy import OAuthHandler, API, Cursor
 from urllib2 import HTTPError
+from collections import deque
 
 DEVELOPERS = {
 	'codinghorror' : {
+		'twitter_screen_name' : 'codinghorror',
 		'twitter_name' : 'Jeff Atwood',
-		'so_user' : None
+		'so_display_name' : None
 	},
 	'Linus__Torvalds' : {
+		'twitter_screen_name' : 'Linus__Torvalds',
 		'twitter_name' : 'Linus Torvalds',
-		'so_user' : None
+		'so_display_name' : None
 	},
 	'jonskeet' : {
+		'twitter_screen_name' : 'jonskeet',
 		'twitter_name' : 'Jon Skeet',
-		'so_user' : None
+		'so_display_name' : None
 	},
 	# 'BorisPouderous' : {
+	# 'twitter_screen_name' : 'BorisPouderous',
 	# 	'name' : "Boris Poudérous",
 	# 	"so_user" : None
 	# }
 }
 
-DEVELOPERS_THRES    = 2500
+DEVELOPERS_THRES    = 100
 NAME_SEARCH_FILTER  = 10
 NAME_JARO_THRES     = 0.90
 LOC_JARO_THRES      = 0.90
@@ -43,16 +49,10 @@ CONSUMER_SECRET     = 'IgRFOa8ijfFVWoa01N9mKX1cQvOTIYh4tyQrVP4o5xzdDuXGTn'
 ACCESS_TOKEN_KEY    = '918825662-3OzaE9V5KTjArMrFdnZ9vraz4ZtraVwyceoolChG'
 ACCESS_TOKEN_SECRET = 'iOXklGWNcZdJS1goVHbxCFi11Lb65nF8CnFfNVrJSNZpg'
 # SO_CLIENT_SECRET  = 'AjN*KCYPu9qFontnH1T7Fw(('
-# SO_CLIENT_KEY     = 'PlqChK)JFcqzNx23OZe30Q(('
+# SO_CLIENT_KEY     = 'PlqChK)JFcqzNx23OZe30Q((' # LIVE version
 SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version 
 
-def paginate(iterable, page_size):
-	i1, i2 = itertools.tee(iterable)
-	while True:
-		iterable, page = (itertools.islice(i1, page_size, None), list(itertools.islice(i2, page_size)))
-		if len(page)==0:
-			break
-		yield page
+LAST_CRAWL_INTERVAL = 24 * 60 * 60 * 7 # Duration since last crawl such that data is deemed stale and a new crawl is required
 
 def init():
 	auth = OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
@@ -63,16 +63,19 @@ def init():
 def get_lists(screen_name):
 	api = init()
 	lists = api.lists_memberships(screen_name=screen_name)
-	return lists[:10]
+	return lists
 
 def get_matching_so_profile(user):
+	"""
+	User must be a dict containing screen_name, name, location and profile_image_url
+	"""
 	result = []
 	matches = compare_name_string(user['screen_name'], user['name'])
 	for i, u in enumerate(matches):
 		img_sim = compare_image(user['profile_image_url'], u.profile_image)
 		try:
 			loc_sim = compare_location(user['location'], u.location)
-		except AttributeError as e:
+		except (AttributeError, KeyError) as e: # Twitter's location field is optional
 			loc_sim = 0
 		matches[i] = (u, img_sim, loc_sim)
 	matches = sorted(matches, cmp=lambda x, y: cmp(x[1], y[1]))
@@ -106,65 +109,146 @@ def compare_image(twitter_url, so_url):
 
 def compare_name_string(screen_name, name):
 	so = stackexchange.Site(stackexchange.StackOverflow, SO_CLIENT_KEY, impose_throttling=True)
-	matches = so.users_by_name(name)
+	matches = so.users_by_name(unicode(name, "utf-8"))
 	result = []
 	if len(matches) < NAME_SEARCH_FILTER:
 		for m in matches:
-			score = jellyfish.jaro_winkler(unicode(name), unicode(m.display_name))
+			score = jellyfish.jaro_winkler(unicode(name, "utf-8"), m.display_name)
 			if score > NAME_JARO_THRES:
 				result.append(m)
 	return result
 
+def deserialize_twitter_user(twitter):
+	"""
+	Take a remote redis user account hash, retrieves keys prefixed with twitter OSN, and removes the prefix, returns a dict
+	"""
+	key_prefix = "twitter_"
+	allowed_keys = ['id', 'name', 'screen_name', 'description', 'profile_image_url', 'location', 'listed_count', 'created_at', 'verified']
+	result = {}
+	for k, v in twitter.iteritems():
+		if k.startswith(key_prefix):
+			result[k[len(key_prefix):]] = v
+	return result
+
+def deserialize_so_user(so):
+	"""
+	Take a remote redis user account hash, retrieves keys prefixed with twitter OSN, and removes the prefix, returns a dict
+	"""
+	key_prefix = "so_"
+	allowed_keys = ['account_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'creation_date']
+	result = {}
+	for k, v in so.iteritems():
+		if k.startswith(key_prefix):
+			result[k[len(key_prefix):]] = v
+	return result
+
+def serialize_and_flatten_twitter_user(twitter):
+	"""
+	Flatten (remove nested objects and dicts) Twitter user json dict and returns a dict of key : value for insert into REDIS
+	Add a prefix to each key corresponding to the social network for namespacing
+	Add timestamp of last modified time
+	"""
+	key_prefix   = "twitter_"
+	allowed_keys = ['id', 'name', 'screen_name', 'description', 'profile_image_url', 'location', 'listed_count', 'created_at', 'verified']
+	result = {}
+	for k in allowed_keys:
+		try:
+			result[key_prefix+k] = twitter[k]
+		except KeyError as e:
+			pass
+	result['twitter_last_crawled'] = time.time()
+	return result
+
+def serialize_and_flatten_so_user(so):
+	"""
+	Flatten (remove nested objects and dicts) StackOverflow user json dict and returns a dict of key: value for insert into REDIS
+	Add a prefix to each key corresponding to the social network for namespacing
+	Add timestamp of last modified time
+	"""
+	key_prefix = "so_"
+	allowed_keys = ['account_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'creation_date']
+	result = {}
+	for k in allowed_keys:
+		try:
+			result[key_prefix+k] = so[k]
+		except KeyError as e:
+			pass
+	result['so_last_crawled'] =  time.time()
+	return result
+
 if __name__ == "__main__":
-	api = init()
-	r = redis.Redis()
-	hname = 'users'
+	api   = init()
+	r     = redis.Redis()
+	q     = deque([x for x in DEVELOPERS.keys()])
 	count = 0
+	for x in q:
+		# Process starting nodes
+		new_member = {"so_display_name" : None}
+		new_member.update(serialize_and_flatten_twitter_user(api.get_user(screen_name=x)._json))
+		r.hmset(x, new_member)
 	print "Name search filter              : %d" % NAME_SEARCH_FILTER
 	print "Name jaro-winkler sim threshold : %.2f" % NAME_JARO_THRES
 	print "Image similarity threshold      : %.2f" % IMG_SIM_THRES
 	print "Getting Twitter developers starting with : jonskeet"
 	print ''
+	# Collect new developers phase
 	while len(DEVELOPERS) < DEVELOPERS_THRES:
-		key = DEVELOPERS.iterkeys().next()
-		print "Developer: " + key
-		r.hset(hname, key, DEVELOPERS[key]) # insert into database
-		lists = get_lists(key)
+		user = q.popleft()
+		print "Developer: " + user
+		lists = get_lists(user)
+		# print "Number of lists : " + str(len(lists))
 		for l in lists:
 			try:
-				for member in l.members()[:100]:
+				for member in l.members():
 					if member.screen_name not in DEVELOPERS:
-						# print "%20s" % member.screen_name,
+						print "%20s" % member.screen_name,
 						count += 1
 						if count % 5 == 0:
 							print ''
-						new_member = {'twitter_name' : member.name, 'so_user' : None}
+						new_member = {'so_display_name' : None}
+						new_member.update(serialize_and_flatten_twitter_user(member._json))
+						q.append(new_member)
 						DEVELOPERS[member.screen_name] = new_member
-						r.hset(hname, member.screen_name, new_member)
+						r.hmset(member.screen_name, new_member)
 			except TweepError as e:
 				print e
 				continue
-			print "List : " + l.name + " done"
+			# print "List : " + l.name + " done"
 		time.sleep(5)
-
 
 	print ''
 	for k, v in DEVELOPERS.iteritems():
-		try:
-			user = api.get_user(screen_name=k)
-		except TweepError as e:
-			print e
-			continue
-		so_user = get_matching_so_profile(user._json)
-		if r.hexists(hname, k):
-			r_acct = r.hget(hname, k)
-			if r_acct['so_user'] is None:
-				so_user = get_matching_so_profile(user._json)
-				time.sleep(2) # Delay to prevent rate limiting from SO
+		# Process twitter account
+		r_acct = r.hgetall(k) # Remote account
+		r_user = {} 		  # Local account which we will push later on
+		if ('twitter_last_crawled' in r_acct and (time.time() - float(r_acct['twitter_last_crawled']))) >  LAST_CRAWL_INTERVAL:
+			# Update twitter user profile info
+			try:
+				user   = api.get_user(screen_name=k)
+				r_user.update(serialize_and_flatten_twitter_user(user._json))
+			except TweepError as e:
+				print e
+		else:
+			# Preserve old twitter user profile data, so_ prefixed keys will be overwritten or preserved later on
+			r_user = r_acct
+		# Process StackOverflow account
+		so_user = None
+		if len(r_acct) != 0:
+			if (r_acct['so_display_name'] == 'None' and 'so_last_crawled' not in r_acct) or (time.time() - float(r_acct['so_last_crawled'])) > LAST_CRAWL_INTERVAL:
+				twitter_acct = deserialize_twitter_user(r_acct)
+				try:
+					so_user = get_matching_so_profile(twitter_acct)
+				except UnicodeDecodeError as e:
+					print str(e) + str(twitter_acct['name'])
 				if so_user is not None:
 					print "Twitter(" + k + ") -> StackOverflow(" + so_user.display_name + ")"
 					# Save into DB
-					r.hset(hname, k, {"twitter_name" : user.name, "twitter_user" : user._json, "so_user" : so_user.__dict__})
+					r_user.update(serialize_and_flatten_so_user(so_user.__dict__))
+					# pprint.pprint(r_user)
+				else:
+					# Set the last crawled date
+					r_user.update({'so_last_crawled' : time.time()})
+		r.hmset(k, r_user)
 		TOTAL_MATCHED_ACC = TOTAL_MATCHED_ACC + 1 if so_user is not None else TOTAL_MATCHED_ACC
 		DEVELOPERS[k]['so_user'] = so_user.__dict__ if so_user is not None else None
 	print ''
