@@ -1,4 +1,7 @@
-import pprint, sys, tweepy, cv2, jellyfish, time, redis
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import pprint, sys, tweepy, cv2, jellyfish, time, redis, json
 sys.path.append('./Py-StackExchange')
 import stackexchange
 from skimage.transform import *
@@ -10,23 +13,27 @@ from tweepy import OAuthHandler, API, Cursor
 from urllib2 import HTTPError
 
 DEVELOPERS = {
-	# 'codinghorror' : {
-	# 	'name' : 'Jeff Atwood',
-	# 	'so_user' : None
-	# },
-	# 'Linus__Torvalds' : {
-	# 	'name' : 'Linus Torvalds',
-	# 	'so_user' : None
-	# },
-	'jonskeet' : {
-		'name' : 'Jon Skeet',
+	'codinghorror' : {
+		'twitter_name' : 'Jeff Atwood',
 		'so_user' : None
-	}
+	},
+	'Linus__Torvalds' : {
+		'twitter_name' : 'Linus Torvalds',
+		'so_user' : None
+	},
+	'jonskeet' : {
+		'twitter_name' : 'Jon Skeet',
+		'so_user' : None
+	},
+	# 'BorisPouderous' : {
+	# 	'name' : "Boris Poudérous",
+	# 	"so_user" : None
+	# }
 }
 
-DEVELOPERS_THRES    = 25000
+DEVELOPERS_THRES    = 2500
 NAME_SEARCH_FILTER  = 10
-NAME_JARO_THRES     = 0.80
+NAME_JARO_THRES     = 0.90
 LOC_JARO_THRES      = 0.90
 IMG_SIM_THRES       = 0.50
 TOTAL_MATCHED_ACC   = 0
@@ -56,7 +63,7 @@ def init():
 def get_lists(screen_name):
 	api = init()
 	lists = api.lists_memberships(screen_name=screen_name)
-	return lists
+	return lists[:10]
 
 def get_matching_so_profile(user):
 	result = []
@@ -98,7 +105,7 @@ def compare_image(twitter_url, so_url):
 	return gis.normalized_distance(t_sig, so_sig)
 
 def compare_name_string(screen_name, name):
-	so = stackexchange.Site(stackexchange.StackOverflow, SO_CLIENT_KEY)
+	so = stackexchange.Site(stackexchange.StackOverflow, SO_CLIENT_KEY, impose_throttling=True)
 	matches = so.users_by_name(name)
 	result = []
 	if len(matches) < NAME_SEARCH_FILTER:
@@ -111,6 +118,7 @@ def compare_name_string(screen_name, name):
 if __name__ == "__main__":
 	api = init()
 	r = redis.Redis()
+	hname = 'users'
 	count = 0
 	print "Name search filter              : %d" % NAME_SEARCH_FILTER
 	print "Name jaro-winkler sim threshold : %.2f" % NAME_JARO_THRES
@@ -119,18 +127,27 @@ if __name__ == "__main__":
 	print ''
 	while len(DEVELOPERS) < DEVELOPERS_THRES:
 		key = DEVELOPERS.iterkeys().next()
-		r.set(key, DEVELOPERS[key]) # insert into database
+		print "Developer: " + key
+		r.hset(hname, key, DEVELOPERS[key]) # insert into database
 		lists = get_lists(key)
 		for l in lists:
-			for member in l.members():
-				if member.screen_name not in DEVELOPERS:
-					print "%20s" % member.screen_name,
-					count += 1
-					if count % 5 == 0:
-						print ''
-					new_member = {'name' : member.name, 'so_user' : None}
-					DEVELOPERS[member.screen_name] = new_member
-					r.set(member.screen_name, new_member)
+			try:
+				for member in l.members()[:100]:
+					if member.screen_name not in DEVELOPERS:
+						# print "%20s" % member.screen_name,
+						count += 1
+						if count % 5 == 0:
+							print ''
+						new_member = {'twitter_name' : member.name, 'so_user' : None}
+						DEVELOPERS[member.screen_name] = new_member
+						r.hset(hname, member.screen_name, new_member)
+			except TweepError as e:
+				print e
+				continue
+			print "List : " + l.name + " done"
+		time.sleep(5)
+
+
 	print ''
 	for k, v in DEVELOPERS.iteritems():
 		try:
@@ -139,11 +156,15 @@ if __name__ == "__main__":
 			print e
 			continue
 		so_user = get_matching_so_profile(user._json)
-		time.sleep(2) # Delay to prevent rate limiting from SO
-		if so_user is not None:
-			print "Twitter(" + k + ") -> StackOverflow(" + so_user.display_name + ")"
-			# Save into DB
-			r.set(k, {"name" : user.name, "twitter_user" : user._json, "so_user" : so_user.__dict__})
+		if r.hexists(hname, k):
+			r_acct = r.hget(hname, k)
+			if r_acct['so_user'] is None:
+				so_user = get_matching_so_profile(user._json)
+				time.sleep(2) # Delay to prevent rate limiting from SO
+				if so_user is not None:
+					print "Twitter(" + k + ") -> StackOverflow(" + so_user.display_name + ")"
+					# Save into DB
+					r.hset(hname, k, {"twitter_name" : user.name, "twitter_user" : user._json, "so_user" : so_user.__dict__})
 		TOTAL_MATCHED_ACC = TOTAL_MATCHED_ACC + 1 if so_user is not None else TOTAL_MATCHED_ACC
 		DEVELOPERS[k]['so_user'] = so_user.__dict__ if so_user is not None else None
 	print ''
