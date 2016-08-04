@@ -11,20 +11,20 @@ from image_match.goldberg import ImageSignature
 # from matplotlib import pyplot as plt
 from tweepy.error import TweepError
 from tweepy import OAuthHandler, API, Cursor
-from urllib2 import HTTPError
+from urllib2 import HTTPError, URLError
 from collections import deque
 
 DEVELOPERS = {
-	'codinghorror' : {
-		'twitter_screen_name' : 'codinghorror',
-		'twitter_name' : 'Jeff Atwood',
-		'so_display_name' : None
-	},
-	'Linus__Torvalds' : {
-		'twitter_screen_name' : 'Linus__Torvalds',
-		'twitter_name' : 'Linus Torvalds',
-		'so_display_name' : None
-	},
+	# 'codinghorror' : {
+	# 	'twitter_screen_name' : 'codinghorror',
+	# 	'twitter_name' : 'Jeff Atwood',
+	# 	'so_display_name' : None
+	# },
+	# 'Linus__Torvalds' : {
+	# 	'twitter_screen_name' : 'Linus__Torvalds',
+	# 	'twitter_name' : 'Linus Torvalds',
+	# 	'so_display_name' : None
+	# },
 	'jonskeet' : {
 		'twitter_screen_name' : 'jonskeet',
 		'twitter_name' : 'Jon Skeet',
@@ -39,31 +39,32 @@ DEVELOPERS = {
 
 DEVELOPERS_THRES    = 100
 NAME_SEARCH_FILTER  = 10
-NAME_JARO_THRES     = 0.90
+NAME_JARO_THRES     = 0.80
 LOC_JARO_THRES      = 0.90
 IMG_SIM_THRES       = 0.50
 TOTAL_MATCHED_ACC   = 0
-
+# LIVE 
 CONSUMER_KEY        = 'fTxnhb0nVeVfQG1a4c77FadFx'
 CONSUMER_SECRET     = 'IgRFOa8ijfFVWoa01N9mKX1cQvOTIYh4tyQrVP4o5xzdDuXGTn'
 ACCESS_TOKEN_KEY    = '918825662-3OzaE9V5KTjArMrFdnZ9vraz4ZtraVwyceoolChG'
 ACCESS_TOKEN_SECRET = 'iOXklGWNcZdJS1goVHbxCFi11Lb65nF8CnFfNVrJSNZpg'
+# DEV
+# CONSUMER_KEY        = "djE9yKkygAhKaBnUcJnrZXybf"
+# CONSUMER_SECRET     = "aaJHJZ8qYlX5yV8O4w8DE2mULcD7XK15khcdHJUfqcB5yQGLi6"
+# ACCESS_TOKEN_KEY    = "918825662-hIm9wYSnjGAwgsmYUDs0jFLZcPsPW4YI5ijddbj1"
+# ACCESS_TOKEN_SECRET = "0zhcnheOwX8XqZXEkvAbGBSlQUVCB3DkRvkSxxEiHLeTZ"
+
 # SO_CLIENT_SECRET  = 'AjN*KCYPu9qFontnH1T7Fw(('
 # SO_CLIENT_KEY     = 'PlqChK)JFcqzNx23OZe30Q((' # LIVE version
 SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version 
 
-LAST_CRAWL_INTERVAL = 24 * 60 * 60 * 7 # Duration since last crawl such that data is deemed stale and a new crawl is required
+LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed stale and a new crawl is required
 
 def init():
 	auth = OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 	auth.set_access_token(ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET)
 	api = API(auth_handler=auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 	return api
-
-def get_lists(screen_name):
-	api = init()
-	lists = api.lists_memberships(screen_name=screen_name)
-	return lists
 
 def get_matching_so_profile(user):
 	"""
@@ -101,7 +102,7 @@ def compare_image(twitter_url, so_url):
 	try:
 		t_sig  = gis.generate_signature(twitter_url)
 		so_sig = gis.generate_signature(so_url)
-	except HTTPError as e:
+	except (URLError, HTTPError) as e:
 		# 404 File not found errors
 		print e
 		return 1.0
@@ -180,6 +181,7 @@ if __name__ == "__main__":
 	api   = init()
 	r     = redis.Redis()
 	q     = deque([x for x in DEVELOPERS.keys()])
+	list_set = []
 	count = 0
 	for x in q:
 		# Process starting nodes
@@ -192,29 +194,41 @@ if __name__ == "__main__":
 	print "Getting Twitter developers starting with : jonskeet"
 	print ''
 	# Collect new developers phase
-	while len(DEVELOPERS) < DEVELOPERS_THRES:
+	while len(DEVELOPERS) < DEVELOPERS_THRES and len(q) != 0:
 		user = q.popleft()
-		print "Developer: " + user
-		lists = get_lists(user)
-		# print "Number of lists : " + str(len(lists))
-		for l in lists:
-			try:
-				for member in l.members():
-					if member.screen_name not in DEVELOPERS:
-						print "%20s" % member.screen_name,
-						count += 1
-						if count % 5 == 0:
-							print ''
-						new_member = {'so_display_name' : None}
-						new_member.update(serialize_and_flatten_twitter_user(member._json))
-						q.append(new_member)
-						DEVELOPERS[member.screen_name] = new_member
-						r.hmset(member.screen_name, new_member)
-			except TweepError as e:
-				print e
-				continue
-			# print "List : " + l.name + " done"
-		time.sleep(5)
+		# print "Developer: " + user
+		list_count = 0
+		try:
+			for pg in Cursor(api.lists_memberships, screen_name=user).pages(1):
+				for l in pg:
+					list_count += 1
+					try:
+						member_list = []
+						for member_pg in Cursor(api.list_members, l.user.screen_name, l.slug).pages(1):
+							for member in member_pg[0:20]:
+								member_list.append(member.screen_name)
+								if member.screen_name not in DEVELOPERS:
+									print "%20s" % member.screen_name,
+									count += 1
+									if count % 5 == 0:
+										print ''
+									new_member = {'so_display_name' : None}
+									new_member.update(serialize_and_flatten_twitter_user(member._json))
+									q.append(new_member)
+									DEVELOPERS[member.screen_name] = new_member
+									r.hmset(member.screen_name, new_member)
+						list_set.append(frozenset(member_list))
+					except TweepError as e:
+						print e
+						continue
+					# print "List : " + l.name + " done"
+				# print "Number of lists : " + str(list_count)
+		except TweepError as e:
+			# Read time out etc.
+			print e
+
+	# score = average_jaccard_sim(set(list_set))
+	# print "Average Jaccard-sim score : " + str(score)
 
 	print ''
 	for k, v in DEVELOPERS.iteritems():
@@ -238,6 +252,7 @@ if __name__ == "__main__":
 				twitter_acct = deserialize_twitter_user(r_acct)
 				try:
 					so_user = get_matching_so_profile(twitter_acct)
+					time.sleep(10)
 				except UnicodeDecodeError as e:
 					print str(e) + str(twitter_acct['name'])
 				if so_user is not None:
