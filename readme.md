@@ -72,3 +72,19 @@ Quora User Activity
 For every user:
 1) Go to https://www.quora.com/profile/Ken-Mazaika/activity
 2) Count number of posts between start and end time to arrive at activity frequency
+
+Setup:
+1) Create virtualenv: mkvirtualenv fyp
+2) Dependencies: pip install -r requirements.txt
+3) Install framework python either by symbolic linking from MAC OS system installed version or follow tutorial here: 
+   http://matplotlib.org/faq/virtualenv_faq.html. Name the executable as fpython (frameworkpython)
+
+How to run:
+DEVELOPMENT
+1) "workon fyp" (name of your virtualenv) to get into the virtualenv
+2) fpython list.py
+
+PRODUCTION
+1) Foreground: fpython list.py
+2) Background, redirect output to logfile: fpython list.py & 
+3) Cron job: 

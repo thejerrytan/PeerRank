@@ -114,3 +114,10 @@ SEED = {
 	'matheducators.stackexchange.com' : ['math8_teacher','MrVaudrey','themathforum'],
 	'earthscience.stackexchange.com' : ['NatGeo','earthinstitute','edmundstump']
 }
+
+if __name__ == "__main__":
+	import random
+	l = SEED.keys()
+	random.shuffle(l)
+	for key in l:
+		print key
