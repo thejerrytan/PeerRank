@@ -31,17 +31,28 @@ LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed sta
 
 class PeerRank:
 	def __init__(self, se_site='stackoverflow.com'):
-		self.twitter_km = KeyManager('Twitter-Search-v1.1', 'keys.json')
-		self.so = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
+		self.twitter_km    = KeyManager('Twitter-Search-v1.1', 'keys.json')
+		self.so            = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
 		self.__init_twitter_api()
-		self.r = redis.Redis()
+		self.r             = redis.Redis(db=0)
+		self.r_tags        = redis.Redis(db=1)
+		self.r_se_experts  = redis.Redis(db=2)
 		self.total_matched = 0
-		self.start_time = time.time()
+		self.start_time    = time.time()
 
 	def __init_twitter_api(self):
 		auth = OAuthHandler(self.twitter_km.get_key()['consumer_key'], self.twitter_km.get_key()['consumer_secret'])
 		auth.set_access_token(self.twitter_km.get_key()['access_token_key'], self.twitter_km.get_key()['access_token_secret'])
 		self.api = API(auth_handler=auth, wait_on_rate_limit=False, wait_on_rate_limit_notify=True)
+
+	def __serialize_se_tag(self, tag):
+		"""Takes a stackexchange tag object and returns the keys that are allowed before storage into Redis"""
+		tag              = tag.json
+		new_tag          = {}
+		new_tag['name']  = tag['name']
+		new_tag['count'] = tag['count']
+		new_tag['site']  = tag['_params_']['site']
+		return new_tag
 
 	def change_se_site(self, se_site):
 		self.so = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
@@ -53,9 +64,7 @@ class PeerRank:
 		self.start_time = time.time()
 
 	def get_matching_so_profile(self, user):
-		"""
-		User must be a dict containing screen_name, name, location and profile_image_url
-		"""
+		"""User must be a dict containing screen_name, name, location and profile_image_url"""
 		result = []
 		matches = self.compare_name_string(user['screen_name'], user['name'])
 		for i, u in enumerate(matches):
@@ -68,6 +77,14 @@ class PeerRank:
 		matches = sorted(matches, cmp=lambda x, y: cmp(x[1], y[1]))
 		matches = filter(lambda x: x[1] < IMG_SIM_THRES, matches)
 		return matches[0][0] if len(matches) == 1 else None
+
+	def is_matching_twitter_profile(self, twitter_user, se_user):
+		"""se_user must be a dict containing screen_name, name, location and profile_image_url"""
+		if self.compare_name_string_se(twitter_user['screen_name'], se_user['display_name']):
+			img_sim = self.compare_image(twitter_user['profile_image_url'], se_user['profile_image'])
+			loc_sim = self.compare_location(twitter_user['location'], se_user['location'])
+			return True if img_sim < IMG_SIM_THRES else False
+		return False
 
 	def compare_location(self, twitter_loc, so_loc):
 		score = jellyfish.jaro_winkler(unicode(twitter_loc), unicode(so_loc))
@@ -102,6 +119,7 @@ class PeerRank:
 		return gis.normalized_distance(t_sig, so_sig)
 
 	def compare_name_string(self, screen_name, name):
+		"""Compare name string for use when matching Twitter experts to SE accounts"""
 		try:
 			matches = self.so.users_by_name(unicode(name, "utf-8"))
 		except (URLError, stackexchange.core.StackExchangeError) as e:
@@ -114,6 +132,11 @@ class PeerRank:
 				if score > NAME_JARO_THRES:
 					result.append(m)
 		return result
+
+	def compare_name_string_se(self, screen_name, so_name):
+		"""Compare name string for use when matching SE experts to Twitter accounts. Returns boolean"""
+		score = jellyfish.jaro_winkler(unicode(so_name, "utf-8"), screen_name)
+		return True if score > NAME_JARO_THRES else False
 
 	def deserialize_twitter_user(self, twitter):
 		"""
@@ -163,7 +186,7 @@ class PeerRank:
 		Add timestamp of last modified time
 		"""
 		key_prefix = "so_"
-		allowed_keys = ['account_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'creation_date']
+		allowed_keys = ['id','account_id', 'user_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'link', 'creation_date']
 		result = {}
 		for k in allowed_keys:
 			try:
@@ -173,7 +196,7 @@ class PeerRank:
 		result['so_last_crawled'] =  time.time()
 		return result
 
-	def link_stackoverflow(self, users):
+	def twitter_to_stackexchange(self, users):
 		for k, v in users.iteritems():
 			# Process twitter account
 			r_acct = self.r.hgetall(k) # Remote account
@@ -273,6 +296,64 @@ class PeerRank:
 		print "Average Jaccard-sim score : " + str(score)
 		return results
 
+	def get_se_tags(self, site):
+		"""Get all tags for stackexchange site and store into Redis"""
+		print "Getting tags for site %s" % site
+		try:
+			self.change_se_site(site)
+			tags = self.so.tags()
+			count = 1
+			for tag in tags:
+				tag.name = self.__add_se_namespace(site, tag.name)
+				print str(count) + ' ' + tag.name + ' ' + str(tag.count)
+				count += 1
+				self.r_tags.hmset(tag.name, self.__serialize_se_tag(tag))
+			time.sleep(10) # Backoff throttle
+		except stackexchange.core.StackExchangeError as e:
+			print e
+			pass
+		return
+
+	def __add_se_namespace(self, site, key):
+		"""Add stackexchange site prefix to key, before inserting into redis as namespace"""
+		return site + ":" + key
+
+	def __get_se_from_key(self, key):
+		"""Strips stackexchange site prefix from redis key"""
+		site = key.split(':')[0]
+		return site
+
+	def get_experts_from_se(self):
+		"""Get experts starting from StackExchange, using top answerers from every tag (topic), and map to their Twitter acct"""
+		# self.change_se_site(site)
+		for t in self.r_tags.scan_iter():
+			JSONModel = stackexchange.core.JSONModel(self.r_tags.get(t))
+			tag = stackexchange.models.Tag(JSONModel)
+			top_answerers = tag.top_answerers('all_time')
+			for topuser in top_answerers:
+				user = topuser.user.__dict__
+				print user
+				user = self.serialize_and_flatten_so_user(user)
+				user['so_last_crawled'] = time.time()
+				self.r_se_experts.hmset(user['display_name'], user)
+
+	def stackexchange_to_twitter(self):
+		for user in self.r_se_experts.scan_iter():
+			u_hash = self.r_se_experts.get(user)
+			for pg in Cursor(self.api.search_users, q=u_hash['display_name']).pages(1):
+				for t_user in pg[:NAME_SEARCH_FILTER]:
+					matches = []
+					print t_user.screen_name
+					if self.is_matching_twitter_profile(t_user._json, u_hash):
+						matches.append(t_user)
+				u_hash['twitter_last_crawled'] = time.time()
+				if len(matches) is 1:
+					# Found
+					u_hash.update(serialize_and_flatten_twitter_user(t_user._json))
+				else:
+					pass
+				self.r_se_experts.hmset(user, u_hash)
+
 def main():
 	pr = PeerRank()
 	topics = seed.SEED.keys()
@@ -290,7 +371,7 @@ def main():
 		print "Getting Twitter experts starting with : %s" % x
 		print ''
 		targeted_list = pr.search_similar_twitter_acct(x)
-		processed_list = pr.link_stackoverflow(targeted_list)
+		processed_list = pr.twitter_to_stackexchange(targeted_list)
 		print ''
 		print "Total targeted Twitter accounts : %d" % len(targeted_list)
 		print "Total SO accounts matched : %d" % pr.total_matched
