@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pprint, sys, tweepy, cv2, jellyfish, time, redis, json, seed, random
+import pprint, sys, traceback, tweepy, cv2, jellyfish, time, redis, json, seed, random, httplib, logger, signal
 sys.path.append('./Py-StackExchange')
 import stackexchange
 from util import *
@@ -31,6 +31,7 @@ LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed sta
 
 class PeerRank:
 	def __init__(self, se_site='stackoverflow.com'):
+		self.logger        = logger.Logger()
 		self.twitter_km    = KeyManager('Twitter-Search-v1.1', 'keys.json')
 		self.so            = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
 		self.__init_twitter_api()
@@ -82,8 +83,13 @@ class PeerRank:
 		"""se_user must be a dict containing screen_name, name, location and profile_image_url"""
 		if self.compare_name_string_se(twitter_user['screen_name'], se_user['display_name']):
 			img_sim = self.compare_image(twitter_user['profile_image_url'], se_user['profile_image'])
-			loc_sim = self.compare_location(twitter_user['location'], se_user['location'])
+			print "       IMG_SIM : %.2f" % img_sim,
+			if 'location' in twitter_user and 'location' in se_user:
+				loc_sim = self.compare_location(twitter_user['location'], se_user['location'])
+				print "       LOC_SIM : %.2f" % loc_sim
+			print
 			return True if img_sim < IMG_SIM_THRES else False
+		print
 		return False
 
 	def compare_location(self, twitter_loc, so_loc):
@@ -107,12 +113,12 @@ class PeerRank:
 		plt.show(block=False)
 		
 	def compare_image(self, twitter_url, so_url):
-		self.plot_image(twitter_url, so_url)
+		# self.plot_image(twitter_url, so_url)
 		gis = ImageSignature()
 		try:
 			t_sig  = gis.generate_signature(twitter_url)
 			so_sig = gis.generate_signature(so_url)
-		except (URLError, HTTPError) as e:
+		except (URLError, HTTPError, httplib.BadStatusLine) as e:
 			# 404 File not found errors
 			print e
 			return 1.0 # Most dissimilar score
@@ -155,7 +161,7 @@ class PeerRank:
 		Take a remote redis user account hash, retrieves keys prefixed with twitter OSN, and removes the prefix, returns a dict
 		"""
 		key_prefix = "so_"
-		allowed_keys = ['account_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'creation_date']
+		allowed_keys = ['id','account_id', 'user_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'link', 'creation_date']
 		result = {}
 		for k, v in so.iteritems():
 			if k.startswith(key_prefix):
@@ -318,41 +324,108 @@ class PeerRank:
 		"""Add stackexchange site prefix to key, before inserting into redis as namespace"""
 		return site + ":" + key
 
-	def __get_se_from_key(self, key):
-		"""Strips stackexchange site prefix from redis key"""
-		site = key.split(':')[0]
-		return site
+	def __get_namespace_from_key(self, key, index):
+		"""Takes a redis key of the form site:content and returns site or content depending on index"""
+		return key.split(':')[index]
 
 	def get_experts_from_se(self):
 		"""Get experts starting from StackExchange, using top answerers from every tag (topic), and map to their Twitter acct"""
+		self.logger.open_log_file(sys._getframe().f_code.co_name)
 		# self.change_se_site(site)
-		for t in self.r_tags.scan_iter():
-			JSONModel = stackexchange.core.JSONModel(self.r_tags.get(t))
-			tag = stackexchange.models.Tag(JSONModel)
-			top_answerers = tag.top_answerers('all_time')
-			for topuser in top_answerers:
-				user = topuser.user.__dict__
-				print user
-				user = self.serialize_and_flatten_so_user(user)
-				user['so_last_crawled'] = time.time()
-				self.r_se_experts.hmset(user['display_name'], user)
+		skip = self.logger.get_value('num_keys_processed')
+		skip = 0 if skip is None else skip
+		count = 0
+		try:
+			for t in self.r_tags.scan_iter():
+				if count < skip:
+					print "Skipped %s" % t
+					count += 1
+					continue
+				site_str = self.__get_namespace_from_key(t, 0)
+				site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
+				tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
+				print "Getting top experts for: %s (%d)" % (tag.name, count)
+				a_count = 0
+				top_answerers = tag.top_answerers('all_time')
+				for topuser in top_answerers:
+					a_count += 1
+					user = topuser.user.__dict__
+					print '    ' + str(a_count) + ' ' + user['display_name']
+					user = self.serialize_and_flatten_so_user(user)
+					user['so_last_crawled'] = time.time()
+					self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
+				time.sleep(1)
+				if count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=count, time_logged=time.time())
+				count += 1
+		except Exception as e:
+			self.logger.log(num_keys_processed=count, time_terminated=time.time(), time_logged=time.time(), exception=e, process=sys._getframe().f_code.co_name, stacktrace=traceback.format_exc())
+			self.logger.close()
 
 	def stackexchange_to_twitter(self):
+		# closure to ensure logger has context
+		def save_on_interrupt(signum, frame):
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(),process=sys._getframe().f_code.co_name)
+			self.logger.close()
+			sys.exit(0)
+		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
+			signal.signal(sig, save_on_interrupt)
+		print "Name search filter              : %d"       % NAME_SEARCH_FILTER
+		print "Name jaro-winkler sim threshold : %.2f"     % NAME_JARO_THRES
+		print "Image similarity threshold      : %.2f"     % IMG_SIM_THRES
+		self.logger.open_log_file(sys._getframe().f_code.co_name)
+		skip = self.logger.get_value('num_keys_processed')
+		skip = 0 if skip is None else skip
+		self.count = 0
+		try:
+			for user in self.r_se_experts.scan_iter():
+				if self.count < skip:
+					self.count += 1
+					continue
+				print "Matching for StackExchange user: %s" % user
+				self.reset_start_time()
+				try:
+					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 1))[0:NAME_SEARCH_FILTER]:
+						u_hash = self.deserialize_so_user(self.r_se_experts.hgetall(user))
+						matches = []
+						print "    Possible candidate: %20s" % t_user.screen_name,
+						if self.is_matching_twitter_profile(t_user._json, u_hash):
+							matches.append(t_user)
+						u_hash = self.serialize_and_flatten_so_user(u_hash)
+						u_hash['twitter_last_crawled'] = time.time()
+						if len(matches) is 1:
+							# Found
+							u_hash.update(self.serialize_and_flatten_twitter_user(matches[0]._json))
+							print "Matched twitter account: %20s" % matches[0].screen_name 
+						else:
+							pass
+						self.r_se_experts.hmset(user, u_hash)
+					self.print_time_taken_for_user(user)
+					if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time())
+					self.count += 1
+					print
+				except RateLimitError as e:
+					print e
+					self.twitter_km.invalidate_key()
+					self.twitter_km.change_key()
+					self.__init_twitter_api()
+				except TweepError as e:
+					print e
+					continue
+		except Exception as e:
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=e, process=sys._getframe().f_code.co_name, stacktrace=traceback.format_exc())
+			self.logger.close()
+
+	def count_matched_se_experts(self):
+		count = 0
+		num_keys = 0
 		for user in self.r_se_experts.scan_iter():
-			u_hash = self.r_se_experts.get(user)
-			for pg in Cursor(self.api.search_users, q=u_hash['display_name']).pages(1):
-				for t_user in pg[:NAME_SEARCH_FILTER]:
-					matches = []
-					print t_user.screen_name
-					if self.is_matching_twitter_profile(t_user._json, u_hash):
-						matches.append(t_user)
-				u_hash['twitter_last_crawled'] = time.time()
-				if len(matches) is 1:
-					# Found
-					u_hash.update(serialize_and_flatten_twitter_user(t_user._json))
-				else:
-					pass
-				self.r_se_experts.hmset(user, u_hash)
+			twitter_acct = self.r_se_experts.hget(user, 'twitter_screen_name')
+			num_keys += 1
+			if twitter_acct is not None:
+				count += 1
+		print "Total key count: %d" % num_keys
+		print "Total matched StackExchange experts : %d in %.2fs" % (count, (time.time() - self.start_time))
+
 
 def main():
 	pr = PeerRank()
