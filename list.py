@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pprint, sys, traceback, tweepy, cv2, jellyfish, time, redis, json, seed, random, httplib, logger, signal
+import pprint, sys, tweepy, cv2, jellyfish, time, redis, json, seed, random, httplib, logger, signal
 sys.path.append('./Py-StackExchange')
 import stackexchange
 from util import *
@@ -118,7 +118,7 @@ class PeerRank:
 		try:
 			t_sig  = gis.generate_signature(twitter_url)
 			so_sig = gis.generate_signature(so_url)
-		except (URLError, HTTPError, httplib.BadStatusLine) as e:
+		except Exception as e:
 			# 404 File not found errors
 			print e
 			return 1.0 # Most dissimilar score
@@ -358,7 +358,8 @@ class PeerRank:
 				if count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=count, time_logged=time.time())
 				count += 1
 		except Exception as e:
-			self.logger.log(num_keys_processed=count, time_terminated=time.time(), time_logged=time.time(), exception=e, process=sys._getframe().f_code.co_name, stacktrace=traceback.format_exc())
+			print e
+			self.logger.log(num_keys_processed=count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
 			self.logger.close()
 
 	def stackexchange_to_twitter(self):
@@ -381,7 +382,7 @@ class PeerRank:
 				if self.count < skip:
 					self.count += 1
 					continue
-				print "Matching for StackExchange user: %s" % user
+				print "Matching for StackExchange user: %s (%.2f)" % (user, self.count)
 				self.reset_start_time()
 				try:
 					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 1))[0:NAME_SEARCH_FILTER]:
@@ -412,7 +413,7 @@ class PeerRank:
 					print e
 					continue
 		except Exception as e:
-			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=e, process=sys._getframe().f_code.co_name, stacktrace=traceback.format_exc())
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__, process=sys._getframe().f_code.co_name)
 			self.logger.close()
 
 	def count_matched_se_experts(self):

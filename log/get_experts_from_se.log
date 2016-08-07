@@ -1,6 +1,8 @@
 {
-    "num_keys_processed": 5800, 
-    "time_started": 1470498681.260114, 
-    "time_logged": 1470504496.25091, 
-    "process": "get_experts_from_se"
+    "exception": "StackExchangeError()502 [throttle_violation]: too many requests from this IP, more requests available in 50310 seconds", 
+    "num_keys_processed": 17700, 
+    "time_started": 1470543714.000376, 
+    "process": "get_experts_from_se", 
+    "time_logged": 1470548371.000133, 
+    "time_terminated": 1470543159.941193
 }

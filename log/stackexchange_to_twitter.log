@@ -1,7 +1,5 @@
 {
-    "num_keys_processed": 19, 
-    "time_started": 1470504545.567732, 
-    "process": "save_on_interrupt", 
-    "time_logged": 1470504575.504724, 
-    "time_terminated": 1470504575.504724
+    "num_keys_processed": 1800, 
+    "time_started": 1470543140.238691, 
+    "time_logged": 1470547938.613535
 }
