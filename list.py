@@ -339,32 +339,35 @@ class PeerRank:
 		self.logger.open_log_file(sys._getframe().f_code.co_name)
 		skip = self.logger.get_value('num_keys_processed')
 		skip = 0 if skip is None else skip
-		count = 0
+		self.count = 0
 		try:
 			for t in self.r_tags.scan_iter():
-				if count < skip:
+				if self.count < skip:
 					print "Skipped %s" % t
-					count += 1
+					self.count += 1
 					continue
 				site_str = self.__get_namespace_from_key(t, 0)
 				site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
 				tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
-				print "Getting top experts for: %s (%d)" % (tag.name, count)
+				print "Getting top experts for: %s (%d)" % (tag.name, self.count)
 				a_count = 0
 				top_answerers = tag.top_answerers('all_time')
 				for topuser in top_answerers:
 					a_count += 1
 					user = topuser.user.__dict__
-					print '    ' + str(a_count) + ' ' + user['display_name']
+					try:
+						print '    ' + unicode(a_count) + ' ' + unicode(user['display_name'])
+					except UnicodeDecodeError as e:
+						print '    ' + e
 					user = self.serialize_and_flatten_so_user(user)
 					user['so_last_crawled'] = time.time()
 					self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
-				time.sleep(1)
-				if count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=count, time_logged=time.time(), exception='')
-				count += 1
+				time.sleep(5)
+				if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
+				self.count += 1
 		except Exception as e:
 			print e
-			self.logger.log(num_keys_processed=count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
 			self.logger.close()
 
 	def stackexchange_to_twitter(self):

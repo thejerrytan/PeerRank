@@ -89,7 +89,7 @@ Scraping Quora:
 What is needed?
 1) Start from https://www.quora.com/topic/Computer-Programming
 2) Look for more topic under related topics section, repeat step 1
-3) If most viewed writers section exist, follow link
+3) If most viewed writers section exist, follow link e.g. url - https://www.quora.com/topic/Computer-Programming/writers
 4) Scrap number of views, username,
 5) Follow username link to user profile about page, scrap user profile
 6) Get username, description, followers, following, location, links to social network, all time views, last 30-day views, profile_image_url, Knows About section
