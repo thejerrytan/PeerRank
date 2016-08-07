@@ -330,8 +330,13 @@ class PeerRank:
 
 	def get_experts_from_se(self):
 		"""Get experts starting from StackExchange, using top answerers from every tag (topic), and map to their Twitter acct"""
+		def save_on_interrupt(signum, frame):
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), process=sys._getframe().f_code.co_name, exception='')
+			self.logger.close()
+			sys.exit(0)
+		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
+			signal.signal(sig, save_on_interrupt)
 		self.logger.open_log_file(sys._getframe().f_code.co_name)
-		# self.change_se_site(site)
 		skip = self.logger.get_value('num_keys_processed')
 		skip = 0 if skip is None else skip
 		count = 0
@@ -355,7 +360,7 @@ class PeerRank:
 					user['so_last_crawled'] = time.time()
 					self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
 				time.sleep(1)
-				if count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=count, time_logged=time.time())
+				if count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=count, time_logged=time.time(), exception='')
 				count += 1
 		except Exception as e:
 			print e
@@ -365,7 +370,7 @@ class PeerRank:
 	def stackexchange_to_twitter(self):
 		# closure to ensure logger has context
 		def save_on_interrupt(signum, frame):
-			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(),process=sys._getframe().f_code.co_name)
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), process=sys._getframe().f_code.co_name, exception='')
 			self.logger.close()
 			sys.exit(0)
 		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
@@ -401,7 +406,7 @@ class PeerRank:
 							pass
 						self.r_se_experts.hmset(user, u_hash)
 					self.print_time_taken_for_user(user)
-					if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time())
+					if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
 					self.count += 1
 					print
 				except RateLimitError as e:

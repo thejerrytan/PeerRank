@@ -34,30 +34,56 @@ Outstanding questions
 1) How to automate seeding of accounts in order to automatically discover new topics
 2) What if we change the analysis to start from Quora and find matching accounts on Twitter?
 3) How do we determine the activity of each user on a OSN
+4) How to overcome IP based throttle limits imposed by SE
+5) How to increase overall throughput to process 3 mil users in 7 days (0.2s per user)? Now, it takes ~ 10s per user, 347 days in total
 
 Redis Schema
-Default DB - 0
-"twitter_screen_name" (HASH)
-	"twitter_id" -> "18193572"
-	"twitter_name" -> "Jon Skeet"
-	"twitter_screen_name" -> "jonskeet"
-	"twitter_profile_image_url" -> "http://pbs.twimg.com/profile_images/553764312716550144/ViDhuySK_normal.jpeg"
-	"twitter_verified" -> "False"
-	"twitter_description" -> "Christian, husband (of @HollyKateSkeet), father, feminist, software engineer (currently at Google), author, @stackoverflow contributor."
-	"twitter_created_at" -> "Wed Dec 17 17:14:47 +0000 2008"
-	"twitter_listed_count" -> "1804"
-	"twitter_location" -> "Reading, UK"
-	"twitter_last_crawled" -> "1470072821.846624"
-	"so_account_id" -> "11683"
-	"so_last_crawled" -> "1470072846.222038"
-	"so_url" -> "http://stackoverflow.com/users/22656"
-	"so_creation_date" -> "2008-09-26 20:05:05"
-	"so_display_name" -> "Jon Skeet"
-	"so_location" -> "Reading, United Kingdom",
-	"so_profile_image" -> "https://www.gravatar.com/avatar/6d8ebb117e8d83d74ea95fbdd0f87e13?s=128&d=identicon&r=PG"
-	"so_reputation" -> "883882"
-	"so_tags" ->
-		""
+DB - 0 (Twitter profiles)
+	"twitter_screen_name" (HASH)
+		"twitter_id" -> "18193572"
+		"twitter_name" -> "Jon Skeet"
+		"twitter_screen_name" -> "jonskeet"
+		"twitter_profile_image_url" -> "http://pbs.twimg.com/profile_images/553764312716550144/ViDhuySK_normal.jpeg"
+		"twitter_verified" -> "False"
+		"twitter_description" -> "Christian, husband (of @HollyKateSkeet), father, feminist, software engineer (currently at Google), author, @stackoverflow contributor."
+		"twitter_created_at" -> "Wed Dec 17 17:14:47 +0000 2008"
+		"twitter_listed_count" -> "1804"
+		"twitter_location" -> "Reading, UK"
+		"twitter_last_crawled" -> "1470072821.846624"
+		"so_account_id" -> "11683"
+		"so_last_crawled" -> "1470072846.222038"
+		"so_url" -> "http://stackoverflow.com/users/22656"
+		"so_creation_date" -> "2008-09-26 20:05:05"
+		"so_display_name" -> "Jon Skeet"
+		"so_location" -> "Reading, United Kingdom",
+		"so_profile_image" -> "https://www.gravatar.com/avatar/6d8ebb117e8d83d74ea95fbdd0f87e13?s=128&d=identicon&r=PG"
+		"so_reputation" -> "883882"
+
+DB - 1 (StackExchange tags)
+	"reverseengineering.stackexchange.com:offset"
+		"count" -> 6
+		"name" -> offset
+		"site" -> "reverseengineering.stackexchange.com"
+
+DB - 2 (StackExchange top answerers for every tag)
+	"magento.stackexchange.com:ctasca"
+		"so_reputation" -> 31
+		"so_profile_image" -> "https://i.stack.imgur.com/Q7lUq.jpg?s=128&g=1"
+		"so_display_name" -> "ctasca"
+		"so_last_crawled" -> "1470509582.730663"
+		"so_id" -> 5045
+		"so_link" -> "http://magento.stackexchange.com/users/5045/ctasca"
+		--------------if matched with Twitter profile---------------
+		"twitter_id" -> ""
+		"twitter_name" -> ""
+		"twitter_screen_name" -> ""
+		"twitter_profile_image_url" -> ""
+		"twitter_verified" -> ""
+		"twitter_description" -> ""
+		"twitter_created_at" -> ""
+		"twitter_listed_count" -> ""
+		"twitter_location" -> ""
+		"twitter_last_crawled" -> ""
 
 Scraping Quora:
 What is needed?
