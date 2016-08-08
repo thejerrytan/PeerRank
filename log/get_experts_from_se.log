@@ -1,8 +1,8 @@
 {
-    "exception": "UnicodeEncodeError('ascii', u'    6 Quiqu\\u0205', 11, 12, 'ordinal not in range(128)')'ascii' codec can't encode character u'\\u0205' in position 11: ordinal not in range(128)", 
-    "num_keys_processed": 10782, 
-    "time_started": 1470598262.986508, 
+    "exception": "StackExchangeError()502 [throttle_violation]: too many requests from this IP, more requests available in 27175 seconds", 
+    "num_keys_processed": 20682, 
+    "time_started": 1470656549.185056, 
     "process": "get_experts_from_se", 
-    "time_logged": 1470598263.859109, 
-    "time_terminated": 1470598263.859108
+    "time_logged": 1470656550.301994, 
+    "time_terminated": 1470656550.301993
 }

@@ -356,8 +356,8 @@ class PeerRank:
 					a_count += 1
 					user = topuser.user.__dict__
 					try:
-						print '    ' + unicode(a_count) + ' ' + unicode(user['display_name'])
-					except UnicodeDecodeError as e:
+						print '    ' + str(a_count) + ' ' + user['display_name'].encode('ascii','ignore')
+					except (UnicodeDecodeError, UnicodeEncodeError) as e:
 						print '    ' + e
 					user = self.serialize_and_flatten_so_user(user)
 					user['so_last_crawled'] = time.time()
