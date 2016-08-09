@@ -18,7 +18,7 @@ class QuoraTopic(scrapy.Item):
     q_last_crawled = scrapy.Field()
     
     def __repr__(self):
-    	return repr({"q_name":self['q_name']})
+        return repr({"q_name":self['q_name']})
 
 class QuoraUser(scrapy.Item):
     # define the fields for your item here like:
@@ -34,11 +34,18 @@ class QuoraUser(scrapy.Item):
     q_num_edits = scrapy.Field()
     q_twitter_link = scrapy.Field()
     q_last_crawled = scrapy.Field()
-    pass
+    
+    def __repr__(self):
+        return repr({"q_name":self['q_name']})    
 
 class QuoraMostViewedWriter(scrapy.Item):
-	q_name = scrapy.Field()
-	q_num_views = scrapy.Field()
-	q_short_description = scrapy.Field()
-	q_num_answers = scrapy.Field()
-	q_last_crawled = scrapy.Field()
+    q_name = scrapy.Field()
+    q_profile_image_url = scrapy.Field()
+    q_topic = scrapy.Field()
+    q_num_views = scrapy.Field()
+    q_short_description = scrapy.Field()
+    q_num_answers = scrapy.Field()
+    q_last_crawled = scrapy.Field()
+
+    def __repr__(self):
+        return repr({"q_name":self['q_name']})

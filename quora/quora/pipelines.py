@@ -11,27 +11,51 @@ DBNAME = 3
 DBHOST = 'localhost'
 DBPORT = 6379
 
-class QuoraPipeline(object):
+class QuoraTopicPipeline(object):
     def __init__(self):
         self.r_conn = redis.Redis(host=DBHOST, port=DBPORT, db=DBNAME)
         topics = set()
         for k in self.r_conn.scan_iter():
             topics.add(k)
         self.processed_keys = topics
-        print self.processed_keys
+        # print self.processed_keys
         
     def process_item(self, item, spider):
-        """item is QuoraTopic"""
-        try:
-            if item['q_name'] not in self.processed_keys:
-                self.r_conn.hmset(item['q_name'], item)
-                self.processed_keys.add(item['q_name'])
-            else:
-                raise DropItem("Duplicate topic: %s" % item['q_name'])
-        except Exception as e:
-            print e
-            pass
-        return item
+        """Only process if item is QuoraTopic"""
+        if spider.name in ['quoran']:
+            try:
+                if item['q_name'] not in self.processed_keys:
+                    self.r_conn.hmset(item['q_name'], item)
+                    self.processed_keys.add(item['q_name'])
+                else:
+                    raise DropItem("Duplicate topic: %s" % item['q_name'])
+            except Exception as e:
+                print e
+                pass
+            return item
+        else:
+            return item
+
+    def close_spider(self, spider):
+        pass
+
+class QuoraMostViewedWriterPipeline(object):
+    def __init__(self):
+        self.r_conn = redis.Redis(host=DBHOST, port=DBPORT, db=4)
+
+    def process_item(self, item, spider):
+        """Only process if item is QuoraMostViewedWriter"""
+        if spider.name in ['quoraExpert']:
+            try:
+                if 'q_name' in item:
+                    topic = item.pop('q_topic', None)
+                    self.r_conn.hmset(item['q_name'], item)
+                    self.r_conn.sadd("quora:topics:" + item['q_name'], topic)
+            except Exception as e:
+                print e
+            return item
+        else:
+            return item
 
     def close_spider(self, spider):
         pass

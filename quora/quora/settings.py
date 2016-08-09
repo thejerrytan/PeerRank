@@ -62,7 +62,8 @@ DOWNLOAD_DELAY=1
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   'quora.pipelines.QuoraPipeline': 300,
+   'quora.pipelines.QuoraTopicPipeline': 300,
+   'quora.pipelines.QuoraMostViewedWriterPipeline': 200
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)

@@ -1,6 +1,8 @@
 from scrapy.loader import ItemLoader
 from scrapy.loader.processors import Join, MapCompose, TakeFirst
-import re
+import re, locale
+
+locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 def views_to_int(views):
 	pattern = re.compile(u'^[0-9]+\.?[0-9]*(k|m)$')
@@ -19,6 +21,12 @@ def views_to_int(views):
 			print match.group(1)
 			return 1000
 
+def extract_ans_from_str(ans_str):
+	return locale.atoi(ans_str.split(' ')[1])
+
+def str_to_int(int_str):
+	return locale.atoi(int_str)
+
 class TopicLoader(ItemLoader):
 	default_output_processor = TakeFirst()
 	q_num_questions_in       = MapCompose(views_to_int)
@@ -27,4 +35,5 @@ class TopicLoader(ItemLoader):
 
 class UserLoader(ItemLoader):
 	default_output_processor = TakeFirst()
-	
+	q_num_answers_in         = MapCompose(extract_ans_from_str)
+	q_num_views_in           = MapCompose(str_to_int)
