@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pprint, sys, tweepy, cv2, jellyfish, time, redis, json, seed, random, httplib, logger, signal
+import pprint, sys, tweepy, cv2, jellyfish, time, redis, json, seed, random, httplib, logger, signal, urllib
 sys.path.append('./Py-StackExchange')
 import stackexchange
 from util import *
@@ -38,6 +38,7 @@ class PeerRank:
 		self.r             = redis.Redis(db=0)
 		self.r_tags        = redis.Redis(db=1)
 		self.r_se_experts  = redis.Redis(db=2)
+		self.r_q_experts   = redis.Redis(db=4)
 		self.total_matched = 0
 		self.start_time    = time.time()
 
@@ -79,13 +80,24 @@ class PeerRank:
 		matches = filter(lambda x: x[1] < IMG_SIM_THRES, matches)
 		return matches[0][0] if len(matches) == 1 else None
 
-	def is_matching_twitter_profile(self, twitter_user, se_user):
+	def is_matching_twitter_profile(self, twitter_user, src_user):
 		"""se_user must be a dict containing screen_name, name, location and profile_image_url"""
-		if self.compare_name_string_se(twitter_user['screen_name'], se_user['display_name']):
-			img_sim = self.compare_image(twitter_user['profile_image_url'], se_user['profile_image'])
+		if 'profile_image_url' in src_user:
+			src_profile_img = src_user['profile_image_url']
+		elif 'profile_image' in src_user:
+			src_profile_img = src_user['profile_image']
+		else:
+			src_profile_img = None
+		if 'display_name' in src_user:
+			src_name = src_user['display_name']
+		else:
+			src_name = src_user['name']
+
+		if self.compare_name_string_se(twitter_user['screen_name'], src_name):
+			img_sim = self.compare_image(twitter_user['profile_image_url'], src_profile_img)
 			print "       IMG_SIM : %.2f" % img_sim,
-			if 'location' in twitter_user and 'location' in se_user:
-				loc_sim = self.compare_location(twitter_user['location'], se_user['location'])
+			if 'location' in twitter_user and 'location' in src_user:
+				loc_sim = self.compare_location(twitter_user['location'], src_user['location'])
 				print "       LOC_SIM : %.2f" % loc_sim
 			print
 			return True if img_sim < IMG_SIM_THRES else False
@@ -157,13 +169,20 @@ class PeerRank:
 		return result
 
 	def deserialize_so_user(self, so):
-		"""
-		Take a remote redis user account hash, retrieves keys prefixed with twitter OSN, and removes the prefix, returns a dict
-		"""
+		"""Take a remote redis user account hash, retrieves keys prefixed with twitter OSN, and removes the prefix, returns a dict"""
 		key_prefix = "so_"
 		allowed_keys = ['id','account_id', 'user_id', 'display_name', 'profile_image', 'location', 'reputation', 'url', 'link', 'creation_date']
 		result = {}
 		for k, v in so.iteritems():
+			if k.startswith(key_prefix):
+				result[k[len(key_prefix):]] = v
+		return result
+
+	def deserialize_q_user(self, q):
+		key_prefix = 'q_'
+		allowed_keys = ['name','profile_image_url','num_views','short_description','num_answers']
+		result = {}
+		for k, v in q.iteritems():
 			if k.startswith(key_prefix):
 				result[k[len(key_prefix):]] = v
 		return result
@@ -200,6 +219,23 @@ class PeerRank:
 			except KeyError as e:
 				pass
 		result['so_last_crawled'] =  time.time()
+		return result
+
+	def serialize_and_flatten_q_user(self, q):
+		"""
+		Flatten (remove nested objects and dicts) Quora user json dict and returns a dict of key: value for insert into REDIS
+		Add a prefix to each key corresponding to the social network for namespacing
+		Add timestamp of last modified time
+		"""
+		key_prefix = "q_"
+		allowed_keys = ['name','profile_image_url','num_views','short_description','num_answers']
+		result = {}
+		for k in allowed_keys:
+			try:
+				result[key_prefix+k] = q[k]
+			except KeyError as e:
+				pass
+		result['q_last_crawled'] =  time.time()
 		return result
 
 	def twitter_to_stackexchange(self, users):
@@ -421,7 +457,75 @@ class PeerRank:
 					print e
 					continue
 		except Exception as e:
-			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__, process=sys._getframe().f_code.co_name)
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
+			self.logger.close()
+
+	def find_self_declared_link(self):
+		pass
+
+	def rename_keys(self):
+		"""Use this to rename keys in redis database to a desired key prefix"""
+		for k in self.r_q_experts.scan_iter():
+			if not k.startswith("quora:topics"):
+				username = k.split(':')[-1]
+				try:
+					self.r_q_experts.renamenx(k, "quora:expert:%s" % username)
+				except redis.exceptions.ResponseError as e:
+					print e
+
+	def quora_to_twitter(self, key_pattern='quora:expert:*'):
+		# closure to ensure logger has context
+		def save_on_interrupt(signum, frame):
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), process=sys._getframe().f_code.co_name, exception='')
+			self.logger.close()
+			sys.exit(0)
+		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
+			signal.signal(sig, save_on_interrupt)
+		print "Name search filter              : %d"       % NAME_SEARCH_FILTER
+		print "Name jaro-winkler sim threshold : %.2f"     % NAME_JARO_THRES
+		print "Image similarity threshold      : %.2f"     % IMG_SIM_THRES
+		self.logger.open_log_file(sys._getframe().f_code.co_name)
+		skip = self.logger.get_value('num_keys_processed')
+		skip = 0 if skip is None else skip
+		self.count = 0
+		try:
+			for user in self.r_q_experts.scan_iter(match=key_pattern):
+				if self.count < skip:
+					self.count += 1
+					continue
+				print "Matching for Quora user: %s (%.2f)" % (user, self.count)
+				self.reset_start_time()
+				try:
+					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 2))[0:NAME_SEARCH_FILTER]:
+						u_hash = self.deserialize_q_user(self.r_q_experts.hgetall(user))
+						matches = []
+						print "    Possible candidate: %20s" % t_user.screen_name,
+						if self.is_matching_twitter_profile(t_user._json, u_hash):
+							matches.append(t_user)
+						u_hash = self.serialize_and_flatten_q_user(u_hash)
+						u_hash['twitter_last_crawled'] = time.time()
+						if len(matches) is 1:
+							# Found
+							u_hash.update(self.serialize_and_flatten_twitter_user(matches[0]._json))
+							print "Matched twitter account: %20s" % matches[0].screen_name 
+						else:
+							pass
+						self.r_q_experts.hmset(user, u_hash)
+					self.print_time_taken_for_user(user)
+					if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
+					self.count += 1
+					print
+				except RateLimitError as e:
+					print e
+					self.twitter_km.invalidate_key()
+					self.twitter_km.change_key()
+					self.__init_twitter_api()
+				except TweepError as e:
+					print e
+					continue
+		except Exception as e:
+			print e
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
 			self.logger.close()
 
 	def count_matched_se_experts(self):
