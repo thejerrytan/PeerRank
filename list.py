@@ -469,7 +469,7 @@ class PeerRank:
 			if not k.startswith("quora:topics"):
 				username = k.split(':')[-1]
 				try:
-					self.r_q_experts.renamenx(k, "quora:expert:%s" % username)
+					self.r_q_experts.rename(k, "quora:expert:%s" % username)
 				except redis.exceptions.ResponseError as e:
 					print e
 

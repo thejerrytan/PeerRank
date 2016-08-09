@@ -1,8 +1,8 @@
 {
     "exception": "", 
-    "num_keys_processed": 28800, 
-    "time_started": 1470719664.521903, 
-    "process": "get_experts_from_se", 
-    "time_logged": 1470734936.860483, 
-    "time_terminated": 1470718674.426694
+    "num_keys_processed": 30000, 
+    "time_started": 1470756874.665509, 
+    "process": "save_on_interrupt", 
+    "time_logged": 1470763495.700525, 
+    "time_terminated": 1470756869.690792
 }

@@ -41,16 +41,19 @@ class QuoraTopicPipeline(object):
 
 class QuoraMostViewedWriterPipeline(object):
     def __init__(self):
-        self.r_conn = redis.Redis(host=DBHOST, port=DBPORT, db=4)
+        self.r_conn           = redis.Redis(host=DBHOST, port=DBPORT, db=4)
+        self.expert_namespace = "quora:expert:"
+        self.topic_namespace  = "quora:topics:"
 
     def process_item(self, item, spider):
         """Only process if item is QuoraMostViewedWriter"""
+
         if spider.name in ['quoraExpert']:
             try:
                 if 'q_name' in item:
                     topic = item.pop('q_topic', None)
-                    self.r_conn.hmset(item['q_name'], item)
-                    self.r_conn.sadd("quora:topics:" + item['q_name'], topic)
+                    self.r_conn.hmset(self.expert_namespace + item['q_name'], item)
+                    self.r_conn.sadd(self.topic_namespace + item['q_name'], topic)
             except Exception as e:
                 print e
             return item
