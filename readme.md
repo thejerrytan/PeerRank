@@ -37,6 +37,9 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 4. How to overcome IP based throttle limits imposed by SE
 5. How to increase overall throughput to process 3 mil users in 7 days (0.2s per user)? Now, it takes ~ 10s per user, 347 days in total
 
+# Issues
+1. Self-declared twitter profile links on Quora user profile is loaded dynamically, not easy to scrape
+
 # Redis Schema
 ## DB - 0 (Twitter profiles)
 	"twitter_screen_name" (HASH)
@@ -67,6 +70,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 		"site" -> "reverseengineering.stackexchange.com"
 
 ## DB - 2 (StackExchange top answerers for every tag)
+	"set:stackexchange:matched_experts_set" : REDIS.SET("magento.stackexchange.com:ctasca",...)
 	"magento.stackexchange.com:ctasca"
 		"so_reputation" -> 31
 		"so_profile_image" -> "https://i.stack.imgur.com/Q7lUq.jpg?s=128&g=1"
@@ -96,9 +100,24 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 		"q_last_crawled" -> "1470596056.640988"
 
 ## DB - 4 (Quora most viewed writers for every topic)
-	"writer_name"
-		"q_name" -> "",
-		"q_" -> ""
+	"quora:matched_experts_set" : REDIS.SET("quora:expert:writer_name",...)
+	"quora:expert:writer_name"
+		"q_name" -> "Sanjay Nandan",
+		"q_short_description" -> "",
+		"q_profile_image_url" -> "https://qph.ec.quoracdn.net/main-thumb-43516739-100-tnrxfcqmwqvzcrmhydixcdlheqozuznw.jpeg",
+		"q_num_views" -> "88833",
+		"q_last_crawled" -> "1470904208.092124"
+		--------------if matched with Twitter profile---------------
+		"twitter_id" -> ""
+		"twitter_name" -> ""
+		"twitter_screen_name" -> ""
+		"twitter_profile_image_url" -> ""
+		"twitter_verified" -> ""
+		"twitter_description" -> ""
+		"twitter_created_at" -> ""
+		"twitter_listed_count" -> ""
+		"twitter_location" -> ""
+		"twitter_last_crawled" -> ""
 
 # Scraping Quora:
 What is needed?
