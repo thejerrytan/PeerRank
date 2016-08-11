@@ -461,6 +461,7 @@ class PeerRank:
 			self.logger.close()
 
 	def find_self_declared_link(self):
+		"""Quora user profile loads Twitter links asynchronously, to be implemented"""
 		pass
 
 	def rename_keys(self):
