@@ -528,17 +528,34 @@ class PeerRank:
 			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
 			self.logger.close()
 
-	def count_matched_se_experts(self):
+	def count_matched_experts(self, site):
+		"""Returns count of matched experts for a given Site"""
+		if site == 'Quora':
+			db = self.r_q_experts
+			key_namespace = 'quora:expert:*'
+			matched_experts_coll = 'quora:matched_experts_set'
+		elif site == 'StackExchange':
+			db = self.r_se_experts
+			key_namespace = '*.com:*'
+			matched_experts_coll = 'set:stackexchange:matched_experts_set'
+		else:
+			raise PeerRankError('Invalid site argument')
 		count = 0
 		num_keys = 0
-		for user in self.r_se_experts.scan_iter():
-			twitter_acct = self.r_se_experts.hget(user, 'twitter_screen_name')
+		for user in db.scan_iter(match=key_namespace):
+			twitter_acct = db.hget(user, 'twitter_screen_name')
 			num_keys += 1
 			if twitter_acct is not None:
+				db.sadd(matched_experts_coll, user)
 				count += 1
 		print "Total key count: %d" % num_keys
-		print "Total matched StackExchange experts : %d in %.2fs" % (count, (time.time() - self.start_time))
+		print "Total matched %s experts : %d in %.2fs" % (site, count, (time.time() - self.start_time))
 
+class PeerRankError(Exception):
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
 
 def main():
 	pr = PeerRank()
