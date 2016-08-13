@@ -71,7 +71,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 
 ## DB - 2 (StackExchange top answerers for every tag)
 	"set:stackexchange:matched_experts_set" : REDIS.SET("magento.stackexchange.com:ctasca",...)
-	"magento.stackexchange.com:topics:user" : REDIS.SET("magento.stackexchange.com:topic1", "stackoverflow.com:topic2")
+	"topics:magento.stackexchange.com:user" : REDIS.SET("magento.stackexchange.com:topic1", "stackoverflow.com:topic2")
 	"magento.stackexchange.com:ctasca"
 		"so_reputation" -> 31
 		"so_profile_image" -> "https://i.stack.imgur.com/Q7lUq.jpg?s=128&g=1"

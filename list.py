@@ -398,6 +398,7 @@ class PeerRank:
 					user = self.serialize_and_flatten_so_user(user)
 					user['so_last_crawled'] = time.time()
 					self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
+					self.r_se_experts.sadd("topics:" + site_str + ':' + user['so_display_name'], t)
 				time.sleep(5)
 				if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
 				self.count += 1
