@@ -38,7 +38,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 5. How to increase overall throughput to process 3 mil users in 7 days (0.2s per user)? Now, it takes ~ 10s per user, 347 days in total
 
 # Issues
-1. Self-declared twitter profile links on Quora user profile is loaded dynamically, not easy to scrape
+1. How to ensure all topics on Quora are scraped. How to ensure new topics are covered?
 
 # Redis Schema
 ## DB - 0 (Twitter profiles)
@@ -71,6 +71,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 
 ## DB - 2 (StackExchange top answerers for every tag)
 	"set:stackexchange:matched_experts_set" : REDIS.SET("magento.stackexchange.com:ctasca",...)
+	"magento.stackexchange.com:topics:user" : REDIS.SET("magento.stackexchange.com:topic1", "stackoverflow.com:topic2")
 	"magento.stackexchange.com:ctasca"
 		"so_reputation" -> 31
 		"so_profile_image" -> "https://i.stack.imgur.com/Q7lUq.jpg?s=128&g=1"
@@ -101,6 +102,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 
 ## DB - 4 (Quora most viewed writers for every topic)
 	"quora:matched_experts_set" : REDIS.SET("quora:expert:writer_name",...)
+	"quora:topics:writer_name" : REDIS.SET("topic1","topic2"...)
 	"quora:expert:writer_name"
 		"q_name" -> "Sanjay Nandan",
 		"q_short_description" -> "",

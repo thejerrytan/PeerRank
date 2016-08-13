@@ -1,8 +1,8 @@
 {
-    "exception": "StackExchangeError()unrecognised error", 
-    "num_keys_processed": 38890, 
-    "time_started": 1470846029.270601, 
+    "exception": "", 
+    "num_keys_processed": 38900, 
+    "time_started": 1471097390.224809, 
     "process": "get_experts_from_se", 
-    "time_logged": 1470846030.8946, 
+    "time_logged": 1471097457.294962, 
     "time_terminated": 1470846030.8946
 }
