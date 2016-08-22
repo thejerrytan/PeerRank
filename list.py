@@ -8,7 +8,7 @@ from util import *
 from skimage.transform import *
 from skimage.io import *
 from image_match.goldberg import ImageSignature
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 from tweepy.error import TweepError
 from tweepy.error import RateLimitError
 from tweepy import OAuthHandler, API, Cursor
