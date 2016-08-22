@@ -99,6 +99,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 		"q_num_followers" -> "5000000"
 		"q_num_edits" -> "567"
 		"q_last_crawled" -> "1470596056.640988"
+		"q_experts_last_crawled" -> "1470596056.640988"
 
 ## DB - 4 (Quora most viewed writers for every topic)
 	"quora:matched_experts_set" : REDIS.SET("quora:expert:writer_name",...)

@@ -47,7 +47,6 @@ class QuoraMostViewedWriterPipeline(object):
 
     def process_item(self, item, spider):
         """Only process if item is QuoraMostViewedWriter"""
-
         if spider.name in ['quoraExpert']:
             try:
                 if 'q_name' in item:

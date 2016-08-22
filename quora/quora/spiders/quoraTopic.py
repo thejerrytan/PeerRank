@@ -4,6 +4,7 @@ from quora.items import QuoraTopic, QuoraUser, QuoraMostViewedWriter
 from quora.loaders import TopicLoader
 
 class QuoratopicSpider(scrapy.Spider):
+    """This spider crawls all topics indexed by Quora on their sitemap in an alphabetical order"""
     name = "quoraTopic"
     allowed_domains = ["www.quora.com"]
     base_url   = 'https://www.quora.com'
@@ -20,7 +21,7 @@ class QuoratopicSpider(scrapy.Spider):
     	pattern = re.compile('^https://www.quora.com/topic/*')
     	for url in urls:
     		if pattern.match(url) is not None:
-    			# print url
+    			print url
     			req = scrapy.Request(url, callback=self.parseTopic)
     			yield req
 

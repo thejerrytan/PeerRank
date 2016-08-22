@@ -4,6 +4,7 @@ from quora.items import QuoraTopic, QuoraUser, QuoraMostViewedWriter
 from quora.loaders import TopicLoader
 
 class QuoranSpider(scrapy.Spider):
+    """This spider crawls related topics, given a starting topic page, in a breadth-first-search manner"""
     name            = "quoran"
     allowed_domains = ["quora.com"]
     base_url        = 'https://www.quora.com'
