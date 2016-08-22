@@ -121,6 +121,11 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 		"twitter_location" -> ""
 		"twitter_last_crawled" -> ""
 
+## DB - 5 Combined (Used for fast lookup given a site and username, what are their linked accounts, if any)
+	"quora:username" -> Hash("so_display_name": 'username', "twitter_screen_name": 'username')
+	"stackexchange:username" -> Hash("twitter_screen_name": 'username')
+	"twitter:username" -> Hash("so_display_name": 'username')
+
 # Scraping Quora:
 What is needed?
 1. Start from https://www.quora.com/topic/Computer-Programming (example)
