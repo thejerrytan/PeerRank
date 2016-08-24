@@ -545,11 +545,12 @@ class PeerRank:
 		count = 0
 		num_keys = 0
 		for user in db.scan_iter(match=key_namespace):
-			twitter_acct = db.hget(user, 'twitter_screen_name')
-			num_keys += 1
-			if twitter_acct is not None:
-				db.sadd(matched_experts_coll, user)
-				count += 1
+			if not user.startswith("topics"): # filter out user topics set
+				twitter_acct = db.hget(user, 'twitter_screen_name')
+				num_keys += 1
+				if twitter_acct is not None:
+					db.sadd(matched_experts_coll, user)
+					count += 1
 		print "Total key count: %d" % num_keys
 		print "Total matched %s experts : %d in %.2fs" % (site, count, (time.time() - self.start_time))
 
