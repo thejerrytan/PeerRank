@@ -1,0 +1,35 @@
+# Installation script
+
+# System dependencies
+sudo apt-get update
+sudo apt-get install git build-essential python-pip libfreetype6-dev libpng-dev python-dev pkg-config libffi-dev libxml2-dev libxslt-dev libssl-dev
+
+# Generate new rsa keys
+ssh-keygen -t rsa
+eval "$(ssh-agent -s)"
+ssh-add
+# Add keys to github via web interface
+
+# Install redis
+wget http://download.redis.io/releases/redis-stable.tar.gz
+tar xzf redis-stable.tar.gz
+cd redis-stable
+make
+make test
+sudo make install
+cd utils
+sudo ./install_server.sh
+# Choose db location as ~/PeerRank
+
+# Git clone
+cd ~
+git clone git@github.com:thejerrytan/PeerRank.git
+
+# Python and python packages
+sudo pip install virtualenv
+sudo pip install virtualenvwrapper
+mkdir ~/.virtualenvs
+export WORKON_HOME = ~/.virtualenvs
+echo ". /usr/local/bin/virtualenvwrapper.sh" >> .bashrc
+mkvirtualenv fyp
+pip install -r requirements.txt

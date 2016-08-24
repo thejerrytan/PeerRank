@@ -1,0 +1,4 @@
+# .gitignore
+*.pyc
+dump.rdb
+keys.json
