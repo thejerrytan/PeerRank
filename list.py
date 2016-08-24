@@ -378,32 +378,36 @@ class PeerRank:
 		self.count = 0
 		try:
 			for t in self.r_tags.scan_iter():
-				if self.count < skip:
-					print "Skipped %s" % t
-					self.count += 1
-					continue
-				site_str = self.__get_namespace_from_key(t, 0)
-				site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
-				tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
-				print "Getting top experts for: %s (%d)" % (tag.name, self.count)
-				a_count = 0
-				top_answerers = tag.top_answerers('all_time')
-				for topuser in top_answerers:
-					a_count += 1
-					user = topuser.user.__dict__
-					try:
-						print '    ' + str(a_count) + ' ' + user['display_name'].encode('ascii','ignore')
-					except (UnicodeDecodeError, UnicodeEncodeError) as e:
-						print '    ' + e
-					user = self.serialize_and_flatten_so_user(user)
-					user['so_last_crawled'] = time.time()
-					self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
-					self.r_se_experts.sadd("topics:" + site_str + ':' + user['so_display_name'], t)
-				time.sleep(5)
-				if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
+				try:
+					if self.count < skip:
+						print "Skipped %s" % t
+						self.count += 1
+						continue
+					site_str = self.__get_namespace_from_key(t, 0)
+					site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
+					tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
+					print "Getting top experts for: %s (%d)" % (tag.name, self.count)
+					a_count = 0
+					top_answerers = tag.top_answerers('all_time')
+					for topuser in top_answerers:
+						a_count += 1
+						user = topuser.user.__dict__
+						try:
+							print '    ' + str(a_count) + ' ' + user['display_name'].encode('ascii','ignore')
+						except (UnicodeDecodeError, UnicodeEncodeError) as e:
+							print '    ' + e
+						user = self.serialize_and_flatten_so_user(user)
+						user['so_last_crawled'] = time.time()
+						self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
+						self.r_se_experts.sadd("topics:" + site_str + ':' + user['so_display_name'], t)
+					time.sleep(5)
+					if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
+				except Exception as e:
+					print e # Continue to next tag
+					self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
 				self.count += 1
 		except Exception as e:
-			print e
+			print e # unhandled exceptions will terminate program
 			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
 			self.logger.close()
 
@@ -449,6 +453,7 @@ class PeerRank:
 					if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
 					self.count += 1
 					print
+					time.sleep(1) # throttling to avoid RateLimitError
 				except RateLimitError as e:
 					print e
 					self.twitter_km.invalidate_key()
