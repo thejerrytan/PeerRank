@@ -2,7 +2,7 @@
 
 # System dependencies
 sudo apt-get update
-sudo apt-get install git build-essential python-pip libfreetype6-dev libpng-dev python-dev pkg-config libffi-dev libxml2-dev libxslt-dev libssl-dev
+sudo apt-get install git build-essential python-pip libfreetype6-dev libpng-dev python-dev pkg-config libffi-dev libxml2-dev libxslt-dev libssl-dev libcairo2-dev
 
 # Generate new rsa keys
 ssh-keygen -t rsa
@@ -19,7 +19,8 @@ make test
 sudo make install
 cd utils
 sudo ./install_server.sh
-# Choose db location as ~/PeerRank
+# Choose db location as $HOME/PeerRank
+sudo service start/stop/restart redis_6379
 
 # Git clone
 cd ~
@@ -33,3 +34,9 @@ export WORKON_HOME = ~/.virtualenvs
 echo ". /usr/local/bin/virtualenvwrapper.sh" >> .bashrc
 mkvirtualenv fyp
 pip install -r requirements.txt
+
+# Transfer keys and data files
+scp ./dump.rdb [username]@[ip]:/home/[username]/PeerRank
+scp ./keys.json [username]@[ip]:/home[username]/PeerRank
+
+# Now you are ready to go!
