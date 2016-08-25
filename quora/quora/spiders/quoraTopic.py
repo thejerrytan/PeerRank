@@ -22,7 +22,7 @@ class QuoratopicSpider(scrapy.Spider):
     def parse(self, response):
         next = response.xpath('//a[contains(@rel, "next")]/@href').extract()
         if len(next) == 1:
-            next_page = scrapy.Request(self.base_url + next, callback=self.parse)
+            next_page = scrapy.Request(self.base_url + next[0], callback=self.parse)
             yield next_page
         urls = response.xpath('//a/@href').extract()
         pattern = re.compile('^https://www.quora.com/topic/*')
