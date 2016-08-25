@@ -8,7 +8,7 @@ import numpy as np
 CRAWL_INTERVAL = 7 * 60 * 60 * 24
 
 def topic_to_url(topic):
-    return topic.replace(' ', '-').replace(',', '').replace('.', '-')
+    return topic.replace(' ', '-').replace(',', '').replace('.', '-').replace('/', '-')
 
 def url_to_topic(topic):
     return topic.replace('-', ' ')
@@ -31,11 +31,6 @@ class QuoraexpertSpider(scrapy.Spider):
             # If need a fresh crawl and url is not in 404 set
             if not self.is_crawled(keys) and start_url not in self.urls_404:
                 self.start_urls.append(start_url)
-
-    # def make_requests_from_url(self, url):
-    #     print url
-    #     # self.r_conn.hset(url_to_topic(match.group(1)), 'q_experts_last_crawled', time.time())
-    #     return scrapy.Request(url)
 
     def is_crawled(self, topic):
         x = self.r_conn.hget(topic, 'q_experts_last_crawled') 
