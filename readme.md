@@ -2,7 +2,7 @@
 Identifying topical experts on Twitter using information from StackOverflow and Quora
 
 # Architecture
-- Redis database
+- Redis database == v3.2.0 (Compile from Redis.org source, not brew install!)
 - Scrapy crawler for crawling Quora
 
 # Methodology
