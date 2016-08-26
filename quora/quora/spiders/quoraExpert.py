@@ -46,12 +46,14 @@ class QuoraexpertSpider(scrapy.Spider):
     def parse(self, response):
         self.download_delay = abs(self.download_delay + np.random.standard_normal() * 10)
         if response.status == 404: # Not found
+            print "(404) %s" % response.url
             self.__blacklist_url(response.url)
             pattern = re.compile(r'./topic/(.*)/writers')
             match = re.search(pattern, response.url)
             if match:
                 self.r_conn.hset(url_to_topic(match.group(1)), 'q_experts_last_crawled', time.time())
         elif response.status == 403: # Forbidden, probably blocked by Quora, send email to me
+            print "(403) %s" % response.url
             msg = MIMEText('403 error has occured while crawling %s' % response.url)
             msg['Subject'] = 'Scrapy error'
             sender = 'sadm@peer-rank-i.comp.nus.edu.sg'
@@ -67,6 +69,7 @@ class QuoraexpertSpider(scrapy.Spider):
         elif response.status == 301:
             self.__blacklist_url(response.url)
         else:
+            print "(%s) %s" % (response.status, response.url)
             topic = response.xpath('//span[contains(@class, "TopicNameSpan")]/text()').extract()
             if len(topic) == 1: # topic is a list of strings
                 topic = topic[0]
