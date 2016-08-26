@@ -20,7 +20,7 @@ class QuoraexpertSpider(scrapy.Spider):
     # start_urls = ['https://www.quora.com/topic/Indian-Administrative-Service-IAS-1/writers']
     start_urls = []
     handle_httpstatus_list = [404, 403, 429, 301]
-    download_delay = 10
+    # download_delay = 10
 
     def __init__(self):
         self.r_conn = redis.Redis(db=3)
@@ -31,6 +31,7 @@ class QuoraexpertSpider(scrapy.Spider):
             # If need a fresh crawl and url is not in 404 set
             if not self.is_crawled(keys) and start_url not in self.urls_404:
                 self.start_urls.append(start_url)
+        print "Number of urls: %d " % len(self.start_urls)
 
     def is_crawled(self, topic):
         x = self.r_conn.hget(topic, 'q_experts_last_crawled') 
@@ -44,7 +45,7 @@ class QuoraexpertSpider(scrapy.Spider):
         self.urls_404.add(url)
 
     def parse(self, response):
-        self.download_delay = abs(self.download_delay + np.random.standard_normal() * 10)
+        # self.download_delay = abs(self.download_delay + np.random.standard_normal() * 10)
         if response.status == 404: # Not found
             print "(404) %s" % response.url
             self.__blacklist_url(response.url)

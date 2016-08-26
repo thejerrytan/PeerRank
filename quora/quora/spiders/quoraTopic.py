@@ -5,21 +5,32 @@ from quora.loaders import TopicLoader
 from random import shuffle
 import numpy as np
 
+CRAWL_INTERVAL = 7 * 60 * 60 * 24
+
 class QuoratopicSpider(scrapy.Spider):
     """This spider crawls all topics indexed by Quora on their sitemap in an alphabetical order"""
     name = "quoraTopic"
     allowed_domains = ["www.quora.com"]
     base_url   = 'https://www.quora.com'
     start_urls = []
-    download_delay = 10
+    # download_delay = 10
 
     def __init__(self):
         self.r_conn       = redis.Redis(db=15)
         self.r_topic_urls = self.r_conn.smembers("quora:topicUrls")
-        self.start_urls   = list(map(lambda x: self.base_url + x, self.r_topic_urls))
+        self.start_urls   = list(map(lambda x: self.base_url + x if not self.is_crawled(self.base_url+x) else '', self.r_topic_urls))
         shuffle(self.start_urls)
 
+    def is_crawled(self, topic_url):
+        x = self.r_conn.hget(topic_url, 'q_last_crawled')
+        if x is not None:
+            return (time.time() - float(x)) < CRAWL_INTERVAL
+        else:
+            return False
+
     def parse(self, response):
+        # Set topic url as crawled
+        self.r_conn.hset(response.url.split('?')[0], 'q_last_crawled', time.time())
         next = response.xpath('//a[contains(@rel, "next")]/@href').extract()
         if len(next) == 1:
             next_page = scrapy.Request(self.base_url + next[0], callback=self.parse)
