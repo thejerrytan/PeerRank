@@ -66,7 +66,7 @@ class QuoraexpertSpider(scrapy.Spider):
             s.quit()
             raise scrapy.exceptions.CloseSpider('403 encountered')
         elif response.status == 429:
-            time.sleep(60 * 60) # Sleep for an hour
+            raise scrapy.exceptions.CloseSpider('429 encountered')
         elif response.status == 301:
             self.__blacklist_url(response.url)
         else:
@@ -89,6 +89,3 @@ class QuoraexpertSpider(scrapy.Spider):
                         u.add_value('q_num_answers', item.xpath('.//a[contains(@class, "answers_link")]/text()').extract())
                         u.add_value('q_last_crawled', time.time())
                         yield u.load_item()
-
-    def closed(self, reason):
-        pass

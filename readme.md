@@ -129,6 +129,9 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 
 ## DB - 15 Utility (Used to help with scraping)
 	"quora:404" -> Set("https://www.quora.com/404.url", "https://www.quora.com/301.url")
+	"quora:topicUrls" -> Set("/sitemap/alphabetical_topics/jp")
+	"https://www.quora.com/sitemap/alphabetical_topics/n0" -> Hash("q_last_crawled" -> 12345534.223454)
+	...
 
 # Scraping Quora:
 What is needed?
