@@ -55,15 +55,15 @@ class QuoraexpertSpider(scrapy.Spider):
                 self.r_conn.hset(url_to_topic(match.group(1)), 'q_experts_last_crawled', time.time())
         elif response.status == 403: # Forbidden, probably blocked by Quora, send email to me
             print "(403) %s" % response.url
-            msg = MIMEText('403 error has occured while crawling %s' % response.url)
-            msg['Subject'] = 'Scrapy error'
-            sender = 'sadm@peer-rank-i.comp.nus.edu.sg'
-            recipient = ['jerrytansk@gmail.com']
-            msg['From'] = sender
-            msg['To'] = ','.join(recipient)
-            s = smtplib.SMTP('localhost', timeout=10)
-            s.sendmail(sender, recipient, msg.as_string())
-            s.quit()
+            # msg = MIMEText('403 error has occured while crawling %s' % response.url)
+            # msg['Subject'] = 'Scrapy error'
+            # sender = 'sadm@peer-rank-i.comp.nus.edu.sg'
+            # recipient = ['jerrytansk@gmail.com']
+            # msg['From'] = sender
+            # msg['To'] = ','.join(recipient)
+            # s = smtplib.SMTP('localhost', timeout=10)
+            # s.sendmail(sender, recipient, msg.as_string())
+            # s.quit()
             raise scrapy.exceptions.CloseSpider('403 encountered')
         elif response.status == 429:
             raise scrapy.exceptions.CloseSpider('429 encountered')

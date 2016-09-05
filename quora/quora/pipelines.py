@@ -22,7 +22,7 @@ class QuoraTopicPipeline(object):
         
     def process_item(self, item, spider):
         """Only process if item is QuoraTopic"""
-        if spider.name in ['quoran', 'quoraTopic']:
+        if spider.name in ['quoran', 'quoraTopic', 'quoraNewExpert']:
             try:
                 if item['q_name'] not in self.processed_keys:
                     self.r_conn.hmset(item['q_name'], item)
@@ -47,7 +47,7 @@ class QuoraMostViewedWriterPipeline(object):
 
     def process_item(self, item, spider):
         """Only process if item is QuoraMostViewedWriter"""
-        if spider.name in ['quoraExpert']:
+        if spider.name in ['quoraExpert', 'quoraNewExpert']:
             try:
                 if 'q_name' in item:
                     topic = item.pop('q_topic', None)
