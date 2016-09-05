@@ -39,6 +39,7 @@ class PeerRank:
 		self.r_tags        = redis.Redis(db=1)
 		self.r_se_experts  = redis.Redis(db=2)
 		self.r_q_experts   = redis.Redis(db=4)
+		self.r_combined    = redis.Redis(db=5)
 		self.total_matched = 0
 		self.start_time    = time.time()
 
@@ -558,6 +559,24 @@ class PeerRank:
 					count += 1
 		print "Total key count: %d" % num_keys
 		print "Total matched %s experts : %d in %.2fs" % (site, count, (time.time() - self.start_time))
+
+	def combined(self):
+		""" Combine all linked accounts into 1 db, with site namespaced keys for O(1) retrieval """
+		for k in self.r.scan_iter():
+			so_display_name = self.r.hget(k, 'so_display_name')
+			if so_display_name is not None and so_display_name != "None":
+				self.r_combined.hmset("twitter:"+k, {"so_display_name" : so_display_name})
+		for k in self.r_se_experts.scan_iter():
+			if not k.startswith("topics") and not k.startswith('set'):
+				twitter_screen_name = self.r_se_experts.hget(k, "twitter_screen_name")
+				if twitter_screen_name is not None:
+					self.r_combined.hmset("stackexchange:"+k.split(':')[1], {"twitter_screen_name" : twitter_screen_name})
+		for k in self.r_q_experts.scan_iter(match="quora:expert:*"):
+			twitter_screen_name = self.r_q_experts.hget(k, "twitter_screen_name")
+			quora_name = k.split(':')[2]
+			if twitter_screen_name is not None:
+				self.r_combined.hmset("quora:"+quora_name, {"twitter_screen_name" : twitter_screen_name})
+				self.r_combined.hset("twitter:"+twitter_screen_name, "quora_name", quora_name)
 
 class PeerRankError(Exception):
 	def __init__(self, value):

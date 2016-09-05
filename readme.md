@@ -123,9 +123,9 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 		"twitter_last_crawled" -> ""
 
 ## DB - 5 Combined (Used for fast lookup given a site and username, what are their linked accounts, if any)
-	"quora:username" -> Hash("so_display_name": 'username', "twitter_screen_name": 'username')
+	"quora:username" -> Hash("twitter_screen_name": 'username')
 	"stackexchange:username" -> Hash("twitter_screen_name": 'username')
-	"twitter:username" -> Hash("so_display_name": 'username')
+	"twitter:username" -> Hash("so_display_name": 'username', "quora_name": 'username')
 
 ## DB - 15 Utility (Used to help with scraping)
 	"quora:404" -> Set("https://www.quora.com/404.url", "https://www.quora.com/301.url")
