@@ -31,17 +31,19 @@ LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed sta
 
 class PeerRank:
 	def __init__(self, se_site='stackoverflow.com'):
-		self.logger        = logger.Logger()
-		self.twitter_km    = KeyManager('Twitter-Search-v1.1', 'keys.json')
-		self.so            = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
+		self.logger            = logger.Logger()
+		self.twitter_km        = KeyManager('Twitter-Search-v1.1', 'keys.json')
+		self.so                = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
 		self.__init_twitter_api()
-		self.r             = redis.Redis(db=0)
-		self.r_tags        = redis.Redis(db=1)
-		self.r_se_experts  = redis.Redis(db=2)
-		self.r_q_experts   = redis.Redis(db=4)
-		self.r_combined    = redis.Redis(db=5)
-		self.total_matched = 0
-		self.start_time    = time.time()
+		self.r                 = redis.Redis(db=0)
+		self.r_tags            = redis.Redis(db=1)
+		self.r_se_experts      = redis.Redis(db=2)
+		self.r_q_topics        = redis.Redis(db=3)
+		self.r_q_experts       = redis.Redis(db=4)
+		self.r_combined        = redis.Redis(db=5)
+		self.r_combined_topics = redis.Redis(db=6)
+		self.total_matched     = 0
+		self.start_time        = time.time()
 
 	def __init_twitter_api(self):
 		auth = OAuthHandler(self.twitter_km.get_key()['consumer_key'], self.twitter_km.get_key()['consumer_secret'])
@@ -366,7 +368,10 @@ class PeerRank:
 		return key.split(':')[index]
 
 	def get_experts_from_se(self):
-		"""Get experts starting from StackExchange, using top answerers from every tag (topic), and map to their Twitter acct"""
+		"""
+			Get experts starting from StackExchange, using top answerers from every tag (topic), and map to their Twitter acct
+			Run this at the start, and once a week subsequently to update changes in reputation.
+		"""
 		def save_on_interrupt(signum, frame):
 			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), process=sys._getframe().f_code.co_name, exception='')
 			self.logger.close()
@@ -387,6 +392,7 @@ class PeerRank:
 					site_str = self.__get_namespace_from_key(t, 0)
 					site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
 					tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
+					topic = site_str.split('.')[0] + ' ' + tag.name
 					print "Getting top experts for: %s (%d)" % (tag.name, self.count)
 					a_count = 0
 					top_answerers = tag.top_answerers('all_time')
@@ -399,6 +405,10 @@ class PeerRank:
 							print '    ' + e
 						user = self.serialize_and_flatten_so_user(user)
 						user['so_last_crawled'] = time.time()
+						# Only add if user is matched to a Twitter account
+						if self.r_se_experts.sismember("set:stackexchange:matched_experts_set", site_str + ":" + user['so_display_name']):
+							name = "stackexchange:" + user['so_display_name']
+							self.r_combined_topics.zadd("stackexchange:" + topic, name, float(user['so_reputation']))
 						self.r_se_experts.hmset(site_str + ':' + user['so_display_name'], user)
 						self.r_se_experts.sadd("topics:" + site_str + ':' + user['so_display_name'], t)
 					time.sleep(5)
@@ -537,7 +547,7 @@ class PeerRank:
 			self.logger.close()
 
 	def count_matched_experts(self, site):
-		"""Returns count of matched experts for a given Site"""
+		"""Returns count of matched experts for a given Site, and adds matched expert to matched_expert_set in respective db"""
 		if site == 'Quora':
 			db = self.r_q_experts
 			key_namespace = 'quora:expert:*'
@@ -577,6 +587,60 @@ class PeerRank:
 			if twitter_screen_name is not None:
 				self.r_combined.hmset("quora:"+quora_name, {"twitter_screen_name" : twitter_screen_name})
 				self.r_combined.hset("twitter:"+twitter_screen_name, "quora_name", quora_name)
+
+	def combine_topics(self):
+		""" 
+			For every topic, store all ranked users in that topic in a zset sorted by score.
+			This is used to populate the db which will be used for the query-based ranking algorithm 
+		"""
+		def save_on_interrupt(signum, frame):
+			self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), process=sys._getframe().f_code.co_name, exception='')
+			self.logger.close()
+			sys.exit(0)
+		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
+			signal.signal(sig, save_on_interrupt)
+		self.logger.open_log_file(sys._getframe().f_code.co_name)
+		skip = self.logger.get_value('num_keys_processed')
+		skip = 0 if skip is None else skip
+		self.count = 0
+		# For stackexchange topics
+		for t in self.r_tags.scan_iter():
+			try:
+				if self.count < skip:
+					print "Skipped %s" % t
+					self.count += 1
+					continue
+				site_str = self.__get_namespace_from_key(t, 0)
+				site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
+				tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
+				topic = site_str.split('.')[0] + ' ' + tag.name
+				print "Getting top experts for: %s (%d)" % (tag.name, self.count)
+				a_count = 0
+				top_answerers = tag.top_answerers('all_time')
+				for topuser in top_answerers:
+					a_count += 1
+					user = topuser.user.__dict__
+					try:
+						print '    ' + str(a_count) + ' ' + user['display_name'].encode('ascii','ignore')
+					except (UnicodeDecodeError, UnicodeEncodeError) as e:
+						print '    ' + e
+					user = self.serialize_and_flatten_so_user(user)
+					# Only add if user is matched to a Twitter account
+					if self.r_se_experts.sismember("set:stackexchange:matched_experts_set", site_str + ":" + user['so_display_name']):
+						name = "stackexchange:" + user['so_display_name']
+						self.r_combined_topics.zadd("stackexchange:"+topic, name, float(user['so_reputation']))
+				time.sleep(5)
+				if self.count % self.logger.LOG_INTERVAL == 0: self.logger.log(num_keys_processed=self.count, time_logged=time.time(), exception='')
+			except Exception as e:
+				print e # Continue to next tag
+				self.logger.log(num_keys_processed=self.count, time_terminated=time.time(), time_logged=time.time(), exception=repr(e) + e.__str__(), process=sys._getframe().f_code.co_name)
+			self.count += 1
+
+		# For quora topics
+		for t in self.r_q_topics.scan_iter():
+			pass
+
+		# For Twitter topics
 
 class PeerRankError(Exception):
 	def __init__(self, value):

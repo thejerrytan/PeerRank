@@ -122,10 +122,16 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 		"twitter_location" -> ""
 		"twitter_last_crawled" -> ""
 
-## DB - 5 Combined (Used for fast lookup given a site and username, what are their linked accounts, if any)
+## DB - 5 Combined User (Used for fast lookup given a site and username, what are their linked accounts, if any)
 	"quora:username" -> Hash("twitter_screen_name": 'username')
 	"stackexchange:username" -> Hash("twitter_screen_name": 'username')
 	"twitter:username" -> Hash("so_display_name": 'username', "quora_name": 'username')
+
+## DB - 6 Combined Topics (topic will be used for cover density ranking with user query)
+	"site:topic1" -> Zset(<site:user1 : score>, <site:user2: score>)
+	"site:topic2" -> Zset(<site:user3 : score, <site:user4: score>)
+	"site:topic3" -> Zset(<site:user1 : score>, <site:user4 : score>)
+	(Score is expertise measure on respective site - reputation for StackOverflow, views on Quora, lg(listed frequency) on Twitter)
 
 ## DB - 15 Utility (Used to help with scraping)
 	"quora:404" -> Set("https://www.quora.com/404.url", "https://www.quora.com/301.url")
