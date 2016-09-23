@@ -1,3 +1,4 @@
+# Import anon-links.txt to mySQL users table using spark. Run this using spark_submit
 from pyspark.conf import SparkConf
 from pyspark import SparkContext
 from pyspark.sql import SparkSession

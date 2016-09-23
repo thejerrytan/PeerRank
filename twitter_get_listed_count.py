@@ -57,9 +57,10 @@ def main():
 	# api = API(auth_handler=auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 	while start <= end:
 		print("Executing page %d" % start)
-		offset = start * 100
+		start_id = start * 100
+		end_id   = start_id + 100
 		try:
-			cursor.execute("SELECT `id` FROM test.temp WHERE listed_count IS NULL LIMIT 100 OFFSET %d" % offset)
+			cursor.execute("SELECT `user_id` FROM test.new_temp WHERE id BETWEEN %d AND %d" % (start_id, end_id))
 		except mysql.connector.errors.IntegrityError as e:
 			print e
 		query = ''
@@ -72,7 +73,7 @@ def main():
 		if len(data) > 0:
 			print("Updating user listed count...")
 			try:
-				cursor.executemany("INSERT INTO test.temp (id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE listed_count=VALUES(listed_count)", data)
+				cursor.executemany("INSERT INTO test.new_temp (user_id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE listed_count=VALUES(listed_count)", data)
 				print("Rows affected: %d" % cursor.rowcount)
 			except Exception as e:
 				print e
