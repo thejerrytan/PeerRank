@@ -11,7 +11,7 @@ def get_users(query, km):
 	data = []
 	key = km.get_key()
 	oauth = OAuth1(key['consumer_key'], key['consumer_secret'], key['access_token_key'], key['access_token_secret'])
-	r = requests.get("https://api.twitter.com/1.1/users/lookup.json?user_id="+query[:-1], auth=oauth)
+	r = requests.get("https://api.twitter.com/1.1/users/lookup.json?user_id="+query, auth=oauth)
 	response = r.json()
 	if response is not None:
 		for user in response:
@@ -33,7 +33,7 @@ def main():
 	""" Remove inactive user_ids from database and add listed_count information for each user"""
 	SO_FAR         = 0
 	NUM_PAGES      = math.ceil((43983853 - SO_FAR) / 100)
-	NO_PROCESS     = 10
+	NO_PROCESS     = 15
 	PG_PER_PROCESS = math.ceil(NUM_PAGES / NO_PROCESS)
 	start          = int(sys.argv[1])
 	end            = start + PG_PER_PROCESS
@@ -57,16 +57,15 @@ def main():
 	# api = API(auth_handler=auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 	while start <= end:
 		print("Executing page %d" % start)
-		start_id = start * 100
-		end_id   = start_id + 100
+		start_id = (start * 100) + 1
+		end_id   = start_id + 99
 		try:
 			cursor.execute("SELECT `user_id` FROM test.new_temp WHERE id BETWEEN %d AND %d" % (start_id, end_id))
 		except mysql.connector.errors.IntegrityError as e:
 			print e
-		query = ''
-		for row in cursor:
-			query += str(row[0]) + ','
 		
+		query = ','.join([str(row[0]) for row in cursor])
+
 		data = get_users(query, km)
 
 		# Insert listed_count
