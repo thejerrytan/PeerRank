@@ -26,21 +26,17 @@ def main(hostname=None):
 		data.append((int(follower.strip('\n')), int(followee.strip('\n'))))
 		line_count += 1
 		if line_count % 100000 == 0:
-			temp  = set(map(lambda x: x[1], data))
-			total = len(temp)
-			count = 0
+			temp  = set(map(lambda x: (x[1],), data))
 			print("Entering data...")
-			for user in temp:
-				try:
-					cursor.execute("INSERT IGNORE INTO test.temp (id) VALUES(%s)" % user)
-					cursor.execute("INSERT IGNORE INTO test.new_temp (user_id) VALUES(%s)" % user)
-					count += 1
-					if (100 * count / (1.0 * total)) % 1 < 0.05:
-						print(str(100 * count / (1.0 * total)) + " completed")
-				except Exception as e:
-					print e
+			try:
+				cursor.executemany("INSERT IGNORE INTO test.temp (id) VALUES(%s)", temp)
+				cursor.executemany("INSERT IGNORE INTO test.new_temp (user_id) VALUES(%s)", temp)
+				print("Rows affected: %d" % cursor.rowcount)
+			except Exception as e:
+				print e
 			cnx.commit()
 			data = []
+			print("Processed so far : %d" % line_count)
 	cnx.close()
 	f.close()
 
