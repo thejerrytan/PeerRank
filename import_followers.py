@@ -12,6 +12,7 @@ PATH_TO_DATA = "/tmp/links%s.txt"
 PER_PAGE       = 100000
 NO_PROCESS     = 20
 
+count = 0
 def process(data, cursor):
 	try:
 		cursor.executemany("INSERT INTO test.follows (follower, followee) VALUES(%s, %s)", data)
@@ -36,6 +37,7 @@ def generate_filename(i):
 	return PATH_TO_DATA % i
 
 def main(hostname=None):
+	global count
 	hostname = MYSQL_HOST if hostname is None else hostname
 	master = len(sys.argv) == 4
 	# Spin up multiple processes
@@ -53,7 +55,6 @@ def main(hostname=None):
 	f = open(generate_filename(sys.argv[2]), 'r')
 	
 	data = []
-	count = 0
 	for line in f:
 		(follower, followee) = line.split(' ')
 		data.append((int(follower.strip('\n')), int(followee.strip('\n'))))
