@@ -37,7 +37,6 @@ def generate_filename(i):
 
 def main(hostname=None):
 	hostname = MYSQL_HOST if hostname is None else hostname
-	print(hostname)
 	master = len(sys.argv) == 4
 	# Spin up multiple processes
 	if master:
