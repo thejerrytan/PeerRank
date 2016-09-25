@@ -34,8 +34,9 @@ def process(data, cursor):
 def generate_filename(i):
 	return PATH_TO_DATA % i
 
-def main(host=None):
-	host = MYSQL_HOST if host is None else host
+def main(hostname=None):
+	hostname = MYSQL_HOST if hostname is None else hostname
+	print(hostname)
 	master = len(sys.argv) == 4
 	# Spin up multiple processes
 	if master:
@@ -47,7 +48,7 @@ def main(host=None):
 			args = shlex.split(cmd)
 			process.append(subprocess.Popen(args, stdin=subprocess.PIPE))
 			print("Starting child process [%s]" % cmd)
-	cnx = mysql.connector.connect(user='root', password='root', host=host, database='test')
+	cnx = mysql.connector.connect(user='root', password='root', host=hostname, database='test')
 	cursor = cnx.cursor()
 	f = open(generate_filename(sys.argv[2]), 'r')
 	
@@ -73,7 +74,7 @@ def main(host=None):
 	sys.exit(0)
 
 if __name__ == "__main__":
-	try:
-		main(host=sys.argv[1])
-	except Exception as e:
+	if sys.argv[1] is not None:
+		main(hostname=sys.argv[1])
+	else:
 		main()
