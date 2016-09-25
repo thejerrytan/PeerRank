@@ -22,7 +22,7 @@ def get_users(query, km):
 				# May be 404 error, which means user is not found, delete from DB
 				print e
 				print(response)
-				if response['errors'][0]['code'] == 88:
+				if response['errors'][0]['code'] == 88 or response['errors'][0]['code'] == 32:
 					# Rate Limit exceeded
 					km.invalidate_key()
 					km.change_key()
@@ -86,6 +86,7 @@ def main():
 		while len(process) > 0:
 			print("Terminating child process...")
 			process.pop().terminate()
+		sys.exit(0)
 
 if __name__=="__main__":
 	main()
