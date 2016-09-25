@@ -11,6 +11,7 @@ MYSQL_HOST     = '104.196.149.230'
 PATH_TO_DATA = "/tmp/links%s.txt"
 PER_PAGE       = 100000
 NO_PROCESS     = 20
+
 def process(data, cursor):
 	try:
 		cursor.executemany("INSERT INTO test.follows (follower, followee) VALUES(%s, %s)", data)
@@ -40,7 +41,7 @@ def main(hostname=None):
 	master = len(sys.argv) == 4
 	# Spin up multiple processes
 	if master:
-		process = []
+		processes = []
 		for i in range(2, NO_PROCESS+1):
 			host_arg  = sys,argv[1]
 			start_arg = i
@@ -69,7 +70,7 @@ def main(hostname=None):
 	if master:
 		while len(process) > 0:
 			print("Terminating child process...")
-			process.pop().terminate()
+			processes.pop().terminate()
 		sys.exit(0)
 	sys.exit(0)
 
