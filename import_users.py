@@ -35,11 +35,14 @@ def main(hostname=None):
 					cursor.execute("INSERT IGNORE INTO test.temp (id) VALUES(%s)" % user)
 					cursor.execute("INSERT IGNORE INTO test.new_temp (user_id) VALUES(%s)" % user)
 					count += 1
-					if (count / 1.0 * total * 100) % 1 < 0.05:
-						print(str(count / 1.0 * total * 100) + " completed")
+					if (100 * count / (1.0 * total)) % 1 < 0.05:
+						print(str(100 * count / (1.0 * total)) + " completed")
 				except Exception as e:
 					print e
+			cnx.commit()
 			data = []
+	cnx.close()
+	f.close()
 
 if __name__ == "__main__":
 	if sys.argv[1] is not None:
