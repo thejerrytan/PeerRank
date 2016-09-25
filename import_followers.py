@@ -22,6 +22,7 @@ def process(data, cursor):
 		new_users = set(map(lambda x: x[1], data))
 		try:
 			new_user_count = 0
+			print("Size of new_users: %d " % len(new_users))
 			for r in new_users:
 				cursor.execute("INSERT IGNORE INTO test.temp (id) VALUES(%s)" % r)
 				new_user_count += cursor.rowcount
