@@ -34,13 +34,14 @@ def process(data, cursor):
 def generate_filename(i):
 	return PATH_TO_DATA % i
 
-def main(host=MYSQL_HOST):
+def main(host=None):
+	host = MYSQL_HOST if host is None else host
 	master = len(sys.argv) == 4
 	# Spin up multiple processes
 	if master:
 		process = []
 		for i in range(2, NO_PROCESS+1):
-			host_arg  = host
+			host_arg  = sys,argv[1]
 			start_arg = i
 			cmd = "python import_followers.py %s %d" % (host_arg, start_arg)
 			args = shlex.split(cmd)
