@@ -10,7 +10,7 @@ MYSQL_HOST     = '104.196.149.230'
 # PATH_TO_DATA = "gs://peerrank-141304.appspot.com/data/links-anon.txt"
 PATH_TO_DATA = "/tmp/links%s.txt"
 PER_PAGE       = 100000
-NO_PROCESS     = 20
+NO_PROCESS     = 10
 
 count = 0
 def process(data, cursor):
