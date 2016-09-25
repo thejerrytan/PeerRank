@@ -19,7 +19,7 @@ def process(data, cursor):
 		print("New edges added: %d" % cursor.rowcount)
 	except Exception as e:
 		print e
-		new_users = map(lambda x: x[1], data)
+		new_users = set(map(lambda x: x[1], data))
 		try:
 			new_user_count = 0
 			for r in new_users:
