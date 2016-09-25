@@ -9,7 +9,7 @@ MYSQL_HOST     = '104.196.149.230'
 # PATH_TO_DATA   = "/Volumes/Mac/data/links1.txt"
 # PATH_TO_DATA = "gs://peerrank-141304.appspot.com/data/links-anon.txt"
 # PATH_TO_DATA = "/tmp/links%s.txt"
-PATH_TO_DATA   = "/tmp/anon-links.txt"
+PATH_TO_DATA   = "/tmp/links-anon.txt"
 PER_PAGE       = 100000
 NO_PROCESS     = 10
 
