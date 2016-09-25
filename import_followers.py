@@ -43,11 +43,11 @@ def main(hostname=None):
 	if master:
 		processes = []
 		for i in range(2, NO_PROCESS+1):
-			host_arg  = sys,argv[1]
+			host_arg  = sys.argv[1]
 			start_arg = i
 			cmd = "python import_followers.py %s %d" % (host_arg, start_arg)
 			args = shlex.split(cmd)
-			process.append(subprocess.Popen(args, stdin=subprocess.PIPE))
+			processes.append(subprocess.Popen(args, stdin=subprocess.PIPE))
 			print("Starting child process [%s]" % cmd)
 	cnx = mysql.connector.connect(user='root', password='root', host=hostname, database='test')
 	cursor = cnx.cursor()
