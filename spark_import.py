@@ -8,6 +8,7 @@ from pyspark.sql.types import *
 MYSQL_USER     = 'root'
 MYSQL_PW       = 'root'
 MYSQL_TABLE    = 'new_temp'
+MYSQL_FOLLOW_TABLE = 'follows'
 MYSQL_DB       = 'test'
 # PATH_TO_DATA = "/Users/Jerry/Desktop/links1.txt"
 # PATH_TO_DATA = "/Volumes/Mac/data/links-anon.txt"
@@ -18,15 +19,20 @@ sc = SparkContext()
 sqlcontext = SQLContext(sc)
 
 spark = SparkSession.builder.master("local").appName("PeerRanK").getOrCreate()
+# schema = StructType([
+# 	StructField("listed_count", IntegerType(), True),
+# 	StructField("user_id", IntegerType(), True)
+# 	])
 schema = StructType([
-	StructField("listed_count", IntegerType(), True),
-	StructField("user_id", IntegerType(), True)
+	StructField("follower", IntegerType(), True),
+	StructField("followee", IntegerType(), True),
 	])
-
 distFile = sc.textFile(PATH_TO_DATA)
-follower = distFile.map(lambda x: int(x.split(' ')[0].strip('\n')))
-users = distFile.map(lambda x: int(x.split(' ')[1].strip('\n'))).union(follower).distinct()
-data = users.map(lambda x: Row(user_id=x, listed_count=None))
+follower = distFile.map(lambda x: tuple(map(lambda y: int(y.strip('\n')), x.split(' '))))
+# users = distFile.map(lambda x: int(x.split(' ')[1].strip('\n'))).union(follower).distinct()
+# data = users.map(lambda x: Row(user_id=x, listed_count=None))
+data = follower.map(lambda x: Row(follower=x[0], followee=x[1]))
 
 df = sqlcontext.createDataFrame(data, schema)
-df.write.jdbc("jdbc:mysql://104.198.155.210:3306/test?user=root&password=root", MYSQL_TABLE, 'append', properties={"driver": 'com.mysql.jdbc.Driver'})
+# df.write.jdbc("jdbc:mysql://104.198.155.210:3306/test?user=root&password=root", MYSQL_TABLE, 'append', properties={"driver": 'com.mysql.jdbc.Driver'})
+df.write.jdbc("jdbc:mysql://104.198.155.210:3306/test?user=root&password=root", MYSQL_FOLLOW_TABLE, 'append', properties={"driver": 'com.mysql.jdbc.Driver'})

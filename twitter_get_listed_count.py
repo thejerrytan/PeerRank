@@ -32,7 +32,7 @@ def get_users(query, km):
 def main():
 	""" Remove inactive user_ids from database and add listed_count information for each user"""
 	SO_FAR         = 0
-	NUM_PAGES      = math.ceil((43983853 - SO_FAR) / 100)
+	NUM_PAGES      = math.ceil((52579682 - SO_FAR) / 100)
 	NO_PROCESS     = 15
 	PG_PER_PROCESS = math.ceil(NUM_PAGES / NO_PROCESS)
 	start          = int(sys.argv[1])
@@ -48,7 +48,7 @@ def main():
 			process.append(subprocess.Popen(args, stdin=subprocess.PIPE))
 			print("Starting child process [%s]" % cmd)
 
-	cnx = mysql.connector.connect(user='root', password='root', host='104.196.149.230', database='test')
+	cnx = mysql.connector.connect(user='root', password='root', host='104.198.155.210', database='test')
 	cursor = cnx.cursor()
 	km = KeyManager('Twitter-Search-v1.1', 'keys.json')
 	key = km.get_key()
