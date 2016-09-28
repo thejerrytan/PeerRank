@@ -7,11 +7,18 @@ from tweepy.error import TweepError
 import mysql.connector, math, requests, subprocess, shlex, sys, time
 
 
-def get_users(query, km):
+def get_users(query, km, retry=None):
 	data = []
 	key = km.get_key()
 	oauth = OAuth1(key['consumer_key'], key['consumer_secret'], key['access_token_key'], key['access_token_secret'])
-	r = requests.get("https://api.twitter.com/1.1/users/lookup.json?user_id="+query, auth=oauth)
+	try:
+		r = requests.get("https://api.twitter.com/1.1/users/lookup.json?user_id="+query, auth=oauth)
+	except Exception as e:
+		retry = 10 if retry is None else retry - 1
+		if retry == 0:
+			return data
+		else:
+			return get_users(query, km, retry=retry)
 	response = r.json()
 	if response is not None:
 		for user in response:
