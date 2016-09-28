@@ -4,7 +4,7 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 from key import KeyManager
 from tweepy import OAuthHandler, API, Cursor
 from tweepy.error import TweepError
-import mysql.connector, math, requests, subprocess, shlex, sys
+import mysql.connector, math, requests, subprocess, shlex, sys, time
 
 
 def get_users(query, km):
@@ -24,6 +24,7 @@ def get_users(query, km):
 				print(response)
 				if response['errors'][0]['code'] == 88 or response['errors'][0]['code'] == 32:
 					# Rate Limit exceeded
+					time.sleep(5)
 					km.invalidate_key()
 					km.change_key()
 					return get_users(query, km)
@@ -33,7 +34,7 @@ def main():
 	""" Remove inactive user_ids from database and add listed_count information for each user"""
 	SO_FAR         = 0
 	NUM_PAGES      = math.ceil((52579682 - SO_FAR) / 100)
-	NO_PROCESS     = 15
+	NO_PROCESS     = 10
 	PG_PER_PROCESS = math.ceil(NUM_PAGES / NO_PROCESS)
 	start          = int(sys.argv[1])
 	end            = start + PG_PER_PROCESS
