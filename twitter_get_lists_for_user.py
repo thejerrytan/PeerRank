@@ -8,7 +8,7 @@ MYSQL_HOST        = '104.198.155.210'
 MYSQL_USER        = 'root'
 MYSQL_PW          = 'root'
 NUM_USERS         = 281699
-NO_THREADS        = 5
+NO_THREADS        = 3
 USERS_PER_PROCESS = math.ceil(NUM_USERS / NO_THREADS)
 SO_FAR            = int(open('twitter_get_lists_for_user_count.txt', 'r').readline())
 cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
@@ -46,7 +46,6 @@ class Worker(threading.Thread):
 		threading.Thread.__init__(self, group=group, target=target, name=name, verbose=verbose)
 
 	def run(self):
-		# print(dir(self.local))
 		# Acquire qlock
 		while True:
 			qlock.acquire()
@@ -76,6 +75,7 @@ class Worker(threading.Thread):
 					f.close()
 		except tweepy.RateLimitError as e:
 			print e
+			time.sleep(60)
 			self.km.invalidate_key()
 			self.km.change_key()
 			self.api = authenticate(self.km.get_key())
