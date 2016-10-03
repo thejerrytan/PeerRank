@@ -82,7 +82,8 @@ class Worker(threading.Thread):
 			self.insert_list(user)
 		except TweepError as e:
 			print(e)
-			if e.message[0]['code'] == 32: # Could not authenticate
+			if type(e.message) is list and e.message[0]['code'] == 32: # Could not authenticate
+				time.sleep(60)
 				self.km.invalidate_key()
 				self.km.change_key()
 				self.api = authenticate(self.km.get_key())
