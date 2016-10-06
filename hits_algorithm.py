@@ -9,7 +9,7 @@ cnx        = mysql.connector.connect(user='root', password='root', host='104.198
 cursor     = cnx.cursor()
 TOTAL      = 1000000000
 PER_PAGE   = 1000000
-NO_THREADS = 100
+NO_THREADS = 50
 qlock      = threading.Lock()
 hub_lock   = threading.Lock()
 auth_lock  = threading.Lock()
@@ -59,40 +59,44 @@ class Worker(threading.Thread):
 		if count.value % 100 == 0:
 			print("Processed %d users." % count.value)
 			print("Time taken per user: %f" % ((time.time() - startTime) / count.value))
-		self.cursor.execute("SELECT `follower` FROM test.follows WHERE followee = %s LIMIT 10000000" , (user,))
-		auth = 0
-		followers = []
-		for row in self.cursor:
-			followers.append(str(row[0]))
-		query = ','.join(followers)
-		if len(followers) == 0:
+		try:
+			self.cursor.execute("SELECT `follower` FROM test.follows WHERE followee = %s LIMIT 10000000" , (user,))
 			auth = 0
-		else:
-			self.cursor.execute("SELECT hub FROM test.users_for_hits WHERE id IN (%s)"  % query)
-			auth = reduce(lambda x, y: x + int(y[0]), self.cursor, 0)
-		auth_lock.acquire()
-		norm_auth += auth * auth
-		auth_lock.release()
-		# print("Auth score for user %s : %d" % (user, auth))
-		self.cursor.execute("UPDATE test.users_for_hits SET authority = %s WHERE id = %s" % (auth, user))
-		self.cnx.commit()
-		# Calculate hub score
-		followee = []
-		self.cursor.execute("SELECT followee FROM test.follows WHERE follower = %s LIMIT 10000000" , (user,))
-		for row in self.cursor:
-			followee.append(str(row[0]))
-		query = ','.join(followee)
-		if len(followee) == 0:
-			hub = 0
-		else:
-			self.cursor.execute("SELECT authority FROM test.users_for_hits WHERE id IN (%s)" % query)
-			hub = reduce(lambda x, y: x + int(y[0]), self.cursor, 0)
-		hub_lock.acquire()
-		norm_hub += hub * hub
-		hub_lock.release()
-		# print("Hub  score for user %s : %d" % (user, hub))
-		self.cursor.execute("UPDATE test.users_for_hits SET hub = %s WHERE id = %s" , (hub, user))
-		self.cnx.commit()
+			followers = []
+			for row in self.cursor:
+				followers.append(str(row[0]))
+			query = ','.join(followers)
+			if len(followers) == 0:
+				auth = 0
+			else:
+				self.cursor.execute("SELECT hub FROM test.users_for_hits WHERE id IN (%s)"  % query)
+				auth = reduce(lambda x, y: x + int(y[0]), self.cursor, 0)
+			auth_lock.acquire()
+			norm_auth += auth * auth
+			auth_lock.release()
+			# print("Auth score for user %s : %d" % (user, auth))
+			self.cursor.execute("UPDATE test.users_for_hits SET authority = %s WHERE id = %s" % (auth, user))
+			self.cnx.commit()
+			# Calculate hub score
+			followee = []
+			self.cursor.execute("SELECT followee FROM test.follows WHERE follower = %s LIMIT 10000000" , (user,))
+			for row in self.cursor:
+				followee.append(str(row[0]))
+			query = ','.join(followee)
+			if len(followee) == 0:
+				hub = 0
+			else:
+				self.cursor.execute("SELECT authority FROM test.users_for_hits WHERE id IN (%s)" % query)
+				hub = reduce(lambda x, y: x + int(y[0]), self.cursor, 0)
+			hub_lock.acquire()
+			norm_hub += hub * hub
+			hub_lock.release()
+			# print("Hub  score for user %s : %d" % (user, hub))
+			self.cursor.execute("UPDATE test.users_for_hits SET hub = %s WHERE id = %s" , (hub, user))
+			self.cnx.commit()
+		except Exception as e:
+			print e
+			pass
 
 def reset():
 	""" Reset hub and authority scores to 1 for all users"""
@@ -144,5 +148,5 @@ def main():
 	cnx.close()
 
 if __name__=="__main__":
-	# reset()
+	reset()
 	main()
