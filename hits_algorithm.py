@@ -131,7 +131,7 @@ def get_users(end, retry=None):
 		retry = 10 if retry is None else retry - 1
 		cnx.close()
 		(cursor, cnx) = reconnect()
-		get_users(retry=retry)
+		get_users(end, retry=retry)
 
 def normalize_scores(end, retry=None):
 	""" Fault tolerant sql query, retry for max 10 tries if connection to MYSQL is lost"""
