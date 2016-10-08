@@ -16,8 +16,8 @@ NO_THREADS = 50
 qlock      = threading.Lock()
 hub_lock   = threading.Lock()
 auth_lock  = threading.Lock()
-norm_hub   = int(SO_FAR.split(',')[2])
-norm_auth  = int(SO_FAR.split(',')[3])
+norm_hub   = float(SO_FAR.split(',')[2])
+norm_auth  = float(SO_FAR.split(',')[3])
 
 class Counter(object):
 	def __init__(self, start=0):
@@ -77,7 +77,7 @@ class Worker(threading.Thread):
 				auth = 0
 			else:
 				self.cursor.execute("SELECT hub FROM test.users_for_hits WHERE id IN (%s)"  % query)
-				auth = reduce(lambda x, y: x + int(y[0]), self.cursor, 0)
+				auth = reduce(lambda x, y: x + float(y[0]), self.cursor, 0)
 			auth_lock.acquire()
 			norm_auth += auth * auth
 			auth_lock.release()
@@ -94,7 +94,7 @@ class Worker(threading.Thread):
 				hub = 0
 			else:
 				self.cursor.execute("SELECT authority FROM test.users_for_hits WHERE id IN (%s)" % query)
-				hub = reduce(lambda x, y: x + int(y[0]), self.cursor, 0)
+				hub = reduce(lambda x, y: x + float(y[0]), self.cursor, 0)
 			hub_lock.acquire()
 			norm_hub += hub * hub
 			hub_lock.release()
