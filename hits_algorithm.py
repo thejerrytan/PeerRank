@@ -8,7 +8,7 @@ MYSQL_PW   = 'root'
 SO_FAR     = open('hits_algorithm.txt', 'r').readline()
 start      = int(SO_FAR.split(',')[0])
 skip       = int(SO_FAR.split(',')[1])
-cnx        = mysql.connector.connect(user='root', password='root', host='104.198.155.210', database='test')
+cnx        = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
 cursor     = cnx.cursor()
 TOTAL      = 1000000000
 PER_PAGE   = 1000000
@@ -35,7 +35,7 @@ class Counter(object):
 count = Counter(start=skip)
 class Worker(threading.Thread):
 	def __init__(self, users, startTime, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
-		self.cnx       = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
+		self.cnx       = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
 		self.cursor    = self.cnx.cursor()
 		self.users     = users # shared resource
 		self.startTime = startTime
@@ -109,7 +109,7 @@ class Worker(threading.Thread):
 
 def reconnect():
 	""" Create a new connection"""
-	cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
+	cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
 	return (cnx.cursor(), cnx)
 
 def reset():
@@ -178,6 +178,8 @@ def main():
 			with open('hits_algorithm.txt', 'w') as f:
 				f.write(str(start) +  ',' + str(count.value) + ',' + str(norm_hub) + ',' + str(norm_auth))
 			f.close()
+			# Reset counter
+			count.value = 0
 		# Normalize
 		start     = 0
 		norm_hub  = math.sqrt(norm_hub)
