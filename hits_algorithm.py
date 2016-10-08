@@ -16,7 +16,6 @@ NO_THREADS = 50
 qlock      = threading.Lock()
 hub_lock   = threading.Lock()
 auth_lock  = threading.Lock()
-startTime  = time.time()
 norm_hub   = int(SO_FAR.split(',')[2])
 norm_auth  = int(SO_FAR.split(',')[3])
 
@@ -35,10 +34,11 @@ class Counter(object):
 
 count = Counter(start=skip)
 class Worker(threading.Thread):
-	def __init__(self, users, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
-		self.cnx    = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
-		self.cursor = self.cnx.cursor()
-		self.users  = users # shared resource
+	def __init__(self, users, startTime, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
+		self.cnx       = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
+		self.cursor    = self.cnx.cursor()
+		self.users     = users # shared resource
+		self.startTime = startTime
 		threading.Thread.__init__(self, group=group, target=target, name=name, verbose=verbose)
 
 	def run(self):
@@ -62,7 +62,7 @@ class Worker(threading.Thread):
 		# Find followers
 		if count.value % 100 == 0:
 			print("Processed %d users." % count.value)
-			print("Time taken per user: %f" % ((time.time() - startTime) / count.value))
+			print("Time taken per user: %f" % ((time.time() - self.startTime) / count.value))
 			with open('hits_algorithm.txt', 'w') as f:
 				f.write(str(start) +  ',' + str(count.value) + ',' + str(norm_hub) + ',' + str(norm_auth))
 			f.close()
@@ -118,7 +118,7 @@ def reset():
 	cnx.commit()
 
 def get_users(end, retry=None):
-	global cursor
+	global cursor, cnx
 	""" Fault tolerant way of getting users from MySQL db, retry for max 10 tries if connection to MYSQL is lost"""
 	try:
 		cursor.execute("SELECT `id` FROM test.users_for_hits WHERE id BETWEEN %s AND %s LIMIT %s" , (start, end, PER_PAGE))
@@ -135,7 +135,7 @@ def get_users(end, retry=None):
 
 def normalize_scores(end, retry=None):
 	""" Fault tolerant sql query, retry for max 10 tries if connection to MYSQL is lost"""
-	global cursor
+	global cursor, cnx
 	try:
 		cursor.execute("UPDATE test.users_for_hits SET hub = (hub / %s), authority = (authority / %s) WHERE id BETWEEN %s AND %s" , (norm_hub, norm_auth, start, end))
 	except Exception as e:
@@ -154,9 +154,10 @@ def main():
 	while iter_count < ITERATIONS:
 		print("ITERATION: %d" % iter_count)
 		while (start + PER_PAGE - 1) < TOTAL:
-			end     = start + PER_PAGE - 1
-			threads = []
-			users   = []
+			startTime = time.time()
+			end       = start + PER_PAGE - 1
+			threads   = []
+			users     = []
 			get_users(end, retry=None)
 			for row in cursor:
 				users.append(int(row[0]))
@@ -167,7 +168,7 @@ def main():
 				skipped += 1
 			# Single producer multiple workers multithreading model
 			for t in range(0, NO_THREADS):
-				t = Worker(users)
+				t = Worker(users, startTime)
 				threads.append(t)
 				t.start()
 			# Synchronize wait for all threads to finish
