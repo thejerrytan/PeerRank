@@ -101,6 +101,11 @@ class Worker(threading.Thread):
 				self.cnx.close()
 				(self.cursor, self.cnx) = reconnect()
 				self.insert_list(user)
+		except Exception as e:
+			print(e)
+			self.cnx.close()
+			(self.cursor, self.cnx) = reconnect()
+			self.insert_list(user)
 
 def main():
 	"""For users with listed_count > 10, get lists they are members of and insert into DB"""
