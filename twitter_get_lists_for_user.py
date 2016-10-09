@@ -10,7 +10,7 @@ MYSQL_PW          = 'root'
 NUM_USERS         = 281699
 NO_THREADS        = 3
 USERS_PER_PROCESS = math.ceil(NUM_USERS / NO_THREADS)
-SO_FAR            = int(open('twitter_get_lists_for_user_count.txt', 'r').readline())
+SO_FAR            = int(open('twitter_get_lists_for_user.txt', 'r').readline())
 cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
 cursor            = cnx.cursor()
 qlock             = threading.Lock()
@@ -47,18 +47,19 @@ class Worker(threading.Thread):
 
 	def run(self):
 		# Acquire qlock
-		while True:
+		hasWork = True
+		while hasWork:
 			qlock.acquire()
-			size = len(self.users)
-			if size > 0:
-				user = self.users.popleft()
-				# Release qlock
+			try:
+				size = len(self.users)
+				if size > 0:
+					user = self.users.popleft()
+				else:
+					self.cnx.close()
+					hasWork = False
+			finally:
 				qlock.release()
-				self.insert_list(user)
-			else:
-				qlock.release()
-				self.cnx.close()
-				break
+			if hasWork: self.insert_list(user)
 
 	def insert_list(self, user):
 		# Insert list
@@ -71,7 +72,7 @@ class Worker(threading.Thread):
 				count.increment()
 				if count.value % 100 == 0:
 					print ("Progress : %d" % int(count.value))
-					with open('twitter_get_lists_for_user_count.txt', 'w') as f:
+					with open('twitter_get_lists_for_user.txt', 'w') as f:
 						f.write(str(count.value))
 					f.close()
 		except tweepy.RateLimitError as e:
@@ -106,10 +107,10 @@ def main():
 			t.start()
 		for t in threads:
 			t.join()
-		with open('twitter_get_lists_for_user_count.txt', 'w') as f:
+		with open('twitter_get_lists_for_user.txt', 'w') as f:
 			f.write(str(count.value))
 		f.close()
-		sys.exit(1)
+		sys.exit(0)
 	except Exception as e:
 		print e
 		cnx.close()
