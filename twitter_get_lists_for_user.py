@@ -35,11 +35,18 @@ def authenticate(key):
 	api = API(auth_handler=auth, wait_on_rate_limit=False, wait_on_rate_limit_notify=True)
 	return api
 
+def reconnect():
+	""" Create a new connection"""
+	cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
+	return (cnx.cursor(), cnx)
+
 class Worker(threading.Thread):
 	def __init__(self, users, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
 		self.local  = threading.local()
 		self.cnx    = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
 		self.cursor = self.cnx.cursor()
+		self.cursor.execute("SET SESSION net_read_timeout = 3600")
+		self.cursor.execute("SET SESSION net_write_timeout = 3600")
 		self.km     = KeyManager('Twitter-Search-v1.1', 'keys.json')
 		self.api    = authenticate(self.km.get_key())
 		self.users  = users # shared resource
@@ -81,6 +88,8 @@ class Worker(threading.Thread):
 			self.km.invalidate_key()
 			self.km.change_key()
 			self.api = authenticate(self.km.get_key())
+			self.cnx.close()
+			(self.cursor, self.cnx) = reconnect()
 			self.insert_list(user)
 		except TweepError as e:
 			print(e)
@@ -89,6 +98,8 @@ class Worker(threading.Thread):
 				self.km.invalidate_key()
 				self.km.change_key()
 				self.api = authenticate(self.km.get_key())
+				self.cnx.close()
+				(self.cursor, self.cnx) = reconnect()
 				self.insert_list(user)
 
 def main():
