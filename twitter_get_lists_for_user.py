@@ -56,6 +56,7 @@ class Worker(threading.Thread):
 				qlock.release()
 				self.insert_list(user)
 			else:
+				qlock.release()
 				self.cnx.close()
 				break
 
