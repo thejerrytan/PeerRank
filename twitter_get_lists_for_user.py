@@ -11,7 +11,7 @@ NUM_USERS         = 281699
 NO_THREADS        = 3
 USERS_PER_PROCESS = math.ceil(NUM_USERS / NO_THREADS)
 SO_FAR            = int(open('twitter_get_lists_for_user.txt', 'r').readline())
-cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
+cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
 cursor            = cnx.cursor()
 qlock             = threading.Lock()
 
@@ -38,7 +38,7 @@ def authenticate(key):
 class Worker(threading.Thread):
 	def __init__(self, users, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
 		self.local  = threading.local()
-		self.cnx    = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
+		self.cnx    = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
 		self.cursor = self.cnx.cursor()
 		self.km     = KeyManager('Twitter-Search-v1.1', 'keys.json')
 		self.api    = authenticate(self.km.get_key())
