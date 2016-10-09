@@ -97,6 +97,7 @@ def main():
 	threads = []
 	print("Starting with: %d " % SO_FAR)
 	try:
+		cursor.execute("SET SESSION max_allowed_packet = 128M")
 		cursor.execute("SET SESSION net_read_timeout = 3600")
 		cursor.execute("SELECT user_id FROM test.new_temp WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
 		cnx.close()
