@@ -21,3 +21,4 @@ circus-web
 chaussette
 selenium==2.53.6
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz
+nltk==3.2.1

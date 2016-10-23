@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 import pprint, sys, tweepy, jellyfish, time, redis, json, seed, random, httplib, logger, signal, urllib
 sys.path.append('./Py-StackExchange')
 import stackexchange
@@ -30,6 +29,12 @@ SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version
 LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed stale and a new crawl is required
 
 class PeerRank:
+	MYSQL_USER     = 'root'
+	MYSQL_PW       = 'root'
+	MYSQL_DB       = 'test'
+	# MYSQL_HOST     = '104.198.155.210'
+	MYSQL_HOST     = '104.198.155.210'
+	STOPWORDS      = ["Twitter", "List", "Formulist"]
 	def __init__(self, se_site='stackoverflow.com'):
 		self.logger            = logger.Logger()
 		self.twitter_km        = KeyManager('Twitter-Search-v1.1', 'keys.json')
@@ -44,6 +49,11 @@ class PeerRank:
 		self.r_combined_topics = redis.Redis(db=6)
 		self.total_matched     = 0
 		self.start_time        = time.time()
+
+	def __init_sql_connection(self):
+		import mysql.connector
+		self.sql    = mysql.connector.connect(user=PeerRank.MYSQL_USER, password=PeerRank.MYSQL_PW, host=PeerRank.MYSQL_HOST, database=PeerRank.MYSQL_DB)
+		self.cursor = self.sql.cursor()
 
 	def __init_twitter_api(self):
 		auth = OAuthHandler(self.twitter_km.get_key()['consumer_key'], self.twitter_km.get_key()['consumer_secret'])
@@ -641,6 +651,106 @@ class PeerRank:
 			pass
 
 		# For Twitter topics
+
+	def infer_twitter_topics(self, user_id):
+		""" 
+			For every Twitter expert identified, return a vector of <topics, frequency> using Cognos methodology
+			1. Separate CamelCase words into individual words
+			2. Apply case-folding, stemming, removal of stop-words + domain-specific stop-words
+			3. Identify nouns and adjectives using part-of-speech tagger
+			4. Group together words that are similar to each other based on edit-distance
+			5. Consider only unigram and bigrams as topics
+		"""
+		import re
+		def camel_case_split(identifier):
+			matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+			return [m.group(0) for m in matches]
+
+		lists = []
+		self.__init_sql_connection()
+		self.cursor.execute("SELECT * FROM test.member_of WHERE user_id = %d" % (user_id))
+		for row in self.cursor:
+			lists.append(int(row[2]))
+		lists_dict = {}
+		for l in lists:
+			self.cursor.execute("SELECT name, description FROM test.lists WHERE list_id = %d LIMIT 1" % (l))
+			for row in self.cursor:
+				lists_dict[l] = unicode(row[0]) + ' ' + unicode(row[1])
+
+		print("Tokenizing")
+		from nltk.tokenize import TweetTokenizer
+		tokenizer = TweetTokenizer(strip_handles=True)
+		lists_tokens = {}
+		for (k,v) in lists_dict.iteritems():
+			lists_tokens[k] = tokenizer.tokenize(v)
+		pprint.pprint(lists_tokens)
+		print
+
+		# Separate CamelCase
+		print("Separate CamelCase")
+		for (k,v) in lists_tokens.iteritems():
+			new_v = []
+			for token in v:
+				matches = camel_case_split(token)
+				new_v = new_v + matches
+			lists_tokens[k] = new_v
+		pprint.pprint(lists_tokens)
+		print
+
+		# Case-folding, stemming, stop-word removal
+		from nltk.stem.snowball import SnowballStemmer
+		from nltk.corpus import stopwords
+		stop = set(stopwords.words('english'))
+		stop.update(PeerRank.STOPWORDS)
+		print("Case folding, stemming and stop-word removal")
+		stemmer = SnowballStemmer('english')
+		for (k,v) in lists_tokens.iteritems():
+			new_v = [stemmer.stem(x.lower()) for x in v if stemmer.stem(x.lower()) not in stop]
+			lists_tokens[k] = new_v
+		pprint.pprint(lists_tokens)
+		print
+
+		# Identify nouns and adjectives
+		print("Identifying nouns and adjectives")
+		from nltk import pos_tag
+		for (k,v) in lists_tokens.iteritems():
+			new_v = pos_tag(v)
+			lists_tokens[k] = [x[0] for x in new_v if x[1] == 'JJ' or x[1] == 'NN']
+		pprint.pprint(lists_tokens)
+		print
+
+		# Group similar words
+		print("Group similar words together")
+		from itertools import combinations
+		for (k, v) in lists_tokens.iteritems():
+			for (w1, w2) in combinations(v, 2):
+				score = jellyfish.jaro_winkler(w1, w2)
+				if score > 0.8 and score < 1.0:
+					print(w1, w2)
+		pprint.pprint(lists_tokens)
+		print
+
+		# Finally, unigram and bigram as topics
+		topics = []
+		from nltk.util import ngrams
+		print("Generating unigram and bigram")
+		for (k,v) in lists_tokens.iteritems():
+			topics += ngrams(v, 1)
+			topics += ngrams(v, 2)
+		pprint.pprint(topics)
+		print
+
+		# Count frequency of occurence
+		from nltk import FreqDist
+		print("Generating <topic, frequency> vector for user")
+		#compute frequency distribution for all the bigrams in the text
+		fdist = FreqDist(topics)
+		doc = ""
+		for k,v in lists_tokens.iteritems():
+			for token in v:
+				fdist[token] += 1
+		for k,v in fdist.items():
+			print k,v
 
 class PeerRankError(Exception):
 	def __init__(self, value):
