@@ -671,30 +671,29 @@ class PeerRank:
 		self.cursor.execute("SELECT * FROM test.member_of WHERE user_id = %d" % (user_id))
 		for row in self.cursor:
 			lists.append(int(row[2]))
-		lists_dict = {}
+		doc = []
 		for l in lists:
 			self.cursor.execute("SELECT name, description FROM test.lists WHERE list_id = %d LIMIT 1" % (l))
 			for row in self.cursor:
-				lists_dict[l] = unicode(row[0]) + ' ' + unicode(row[1])
+				doc.append(unicode(row[0]) + ' ' + unicode(row[1]))
+		print(doc)
 
 		print("Tokenizing")
 		from nltk.tokenize import TweetTokenizer
 		tokenizer = TweetTokenizer(strip_handles=True)
-		lists_tokens = {}
-		for (k,v) in lists_dict.iteritems():
-			lists_tokens[k] = tokenizer.tokenize(v)
-		pprint.pprint(lists_tokens)
+		token_doc = []
+		for desc in doc:
+			token_doc += tokenizer.tokenize(desc)
+		pprint.pprint(token_doc)
 		print
 
 		# Separate CamelCase
+		temp_token_doc = []
 		print("Separate CamelCase")
-		for (k,v) in lists_tokens.iteritems():
-			new_v = []
-			for token in v:
-				matches = camel_case_split(token)
-				new_v = new_v + matches
-			lists_tokens[k] = new_v
-		pprint.pprint(lists_tokens)
+		for token in token_doc:
+			matches = camel_case_split(token)
+			temp_token_doc += matches
+		pprint.pprint(temp_token_doc)
 		print
 
 		# Case-folding, stemming, stop-word removal
@@ -704,39 +703,35 @@ class PeerRank:
 		stop.update(PeerRank.STOPWORDS)
 		print("Case folding, stemming and stop-word removal")
 		stemmer = SnowballStemmer('english')
-		for (k,v) in lists_tokens.iteritems():
-			new_v = [stemmer.stem(x.lower()) for x in v if stemmer.stem(x.lower()) not in stop]
-			lists_tokens[k] = new_v
-		pprint.pprint(lists_tokens)
+		token_doc = [stemmer.stem(x.lower()) for x in temp_token_doc if stemmer.stem(x.lower()) not in stop]
+		pprint.pprint(token_doc)
 		print
 
 		# Identify nouns and adjectives
 		print("Identifying nouns and adjectives")
 		from nltk import pos_tag
-		for (k,v) in lists_tokens.iteritems():
-			new_v = pos_tag(v)
-			lists_tokens[k] = [x[0] for x in new_v if x[1] == 'JJ' or x[1] == 'NN']
-		pprint.pprint(lists_tokens)
+		tagged_doc = pos_tag(token_doc)
+		temp_token_doc = [x[0] for x in tagged_doc if x[1] == 'NN' or x[1] == 'JJ']
+		pprint.pprint(temp_token_doc)
 		print
 
 		# Group similar words
 		print("Group similar words together")
 		from itertools import combinations
-		for (k, v) in lists_tokens.iteritems():
-			for (w1, w2) in combinations(v, 2):
-				score = jellyfish.jaro_winkler(w1, w2)
-				if score > 0.8 and score < 1.0:
-					print(w1, w2)
-		pprint.pprint(lists_tokens)
+		for (w1, w2) in combinations(temp_token_doc, 2):
+			score = jellyfish.jaro_winkler(unicode(w1), unicode(w2))
+			if score > 0.8 and score < 1.0:
+				print(w1, w2)
+		pprint.pprint(temp_token_doc)
 		print
 
 		# Finally, unigram and bigram as topics
 		topics = []
 		from nltk.util import ngrams
 		print("Generating unigram and bigram")
-		for (k,v) in lists_tokens.iteritems():
-			topics += ngrams(v, 1)
-			topics += ngrams(v, 2)
+		topics = list(ngrams(temp_token_doc, 1))
+		topics += list(ngrams(temp_token_doc, 2))
+		# topics = list(topics)
 		pprint.pprint(topics)
 		print
 
@@ -745,10 +740,8 @@ class PeerRank:
 		print("Generating <topic, frequency> vector for user")
 		#compute frequency distribution for all the bigrams in the text
 		fdist = FreqDist(topics)
-		doc = ""
-		for k,v in lists_tokens.iteritems():
-			for token in v:
-				fdist[token] += 1
+		for token in temp_token_doc:
+			fdist[token] += 1
 		for k,v in fdist.items():
 			print k,v
 
