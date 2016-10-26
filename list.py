@@ -652,6 +652,14 @@ class PeerRank:
 
 		# For Twitter topics
 
+	def get_listed_count_for_twitter_user(self, user_id):
+		self.__init_sql_connection()
+		self.cursor.execute("SELECT listed_count FROM test.new_temp WHERE user_id = %d" % (user_id))
+		for row in self.cursor:
+			listed_count = row[0]
+			return listed_count
+		raise(PeerRankError("Cannot find user in database"))
+
 	def infer_twitter_topics(self, user_id):
 		""" 
 			For every Twitter expert identified, return a vector of <topics, frequency> using Cognos methodology
@@ -676,7 +684,7 @@ class PeerRank:
 			self.cursor.execute("SELECT name, description FROM test.lists WHERE list_id = %d LIMIT 1" % (l))
 			for row in self.cursor:
 				doc.append(unicode(row[0]) + ' ' + unicode(row[1]))
-		print(doc)
+		# print(doc)
 
 		print("Tokenizing")
 		from nltk.tokenize import TweetTokenizer
@@ -684,8 +692,8 @@ class PeerRank:
 		token_doc = []
 		for desc in doc:
 			token_doc += tokenizer.tokenize(desc)
-		pprint.pprint(token_doc)
-		print
+		# pprint.pprint(token_doc)
+		# print
 
 		# Separate CamelCase
 		temp_token_doc = []
@@ -693,8 +701,8 @@ class PeerRank:
 		for token in token_doc:
 			matches = camel_case_split(token)
 			temp_token_doc += matches
-		pprint.pprint(temp_token_doc)
-		print
+		# pprint.pprint(temp_token_doc)
+		# print
 
 		# Case-folding, stemming, stop-word removal
 		from nltk.stem.snowball import SnowballStemmer
@@ -704,26 +712,27 @@ class PeerRank:
 		print("Case folding, stemming and stop-word removal")
 		stemmer = SnowballStemmer('english')
 		token_doc = [stemmer.stem(x.lower()) for x in temp_token_doc if stemmer.stem(x.lower()) not in stop]
-		pprint.pprint(token_doc)
-		print
+		# pprint.pprint(token_doc)
+		# print
 
 		# Identify nouns and adjectives
 		print("Identifying nouns and adjectives")
 		from nltk import pos_tag
 		tagged_doc = pos_tag(token_doc)
 		temp_token_doc = [x[0] for x in tagged_doc if x[1] == 'NN' or x[1] == 'JJ']
-		pprint.pprint(temp_token_doc)
-		print
+		# pprint.pprint(temp_token_doc)
+		# print
 
 		# Group similar words
-		print("Group similar words together")
-		from itertools import combinations
-		for (w1, w2) in combinations(temp_token_doc, 2):
-			score = jellyfish.jaro_winkler(unicode(w1), unicode(w2))
-			if score > 0.8 and score < 1.0:
-				print(w1, w2)
-		pprint.pprint(temp_token_doc)
-		print
+		# print("Group similar words together")
+		# from itertools import combinations
+		# for (w1, w2) in combinations(temp_token_doc, 2):
+		# 	score = jellyfish.jaro_winkler(unicode(w1), unicode(w2))
+		# 	if score > 0.8 and score < 1.0:
+				# print(w1, w2)
+				# pass
+		# pprint.pprint(temp_token_doc)
+		# print
 
 		# Finally, unigram and bigram as topics
 		topics = []
@@ -731,18 +740,41 @@ class PeerRank:
 		print("Generating unigram and bigram")
 		topics = set(ngrams(temp_token_doc, 1))
 		topics.update(set(ngrams(temp_token_doc, 2)))
-		pprint.pprint(topics)
-		print
+		# pprint.pprint(topics)
+		# print
+
+		# Convert tuples to string
+		topics = [reduce(lambda y,z : y + " " + z, x) for x in topics]
+		# pprint.pprint(topics)
+		# print
 
 		# Count frequency of occurence
 		from nltk import FreqDist
 		print("Generating <topic, frequency> vector for user")
-		#compute frequency distribution for all the bigrams in the text
+		#compute frequency distribution for all the ngrams in the text
 		fdist = FreqDist(topics)
 		for token in temp_token_doc:
 			fdist[token] += 1
-		for k,v in fdist.items():
-			print k,v
+		# for k,v in fdist.items():
+			# print k,v
+
+		return fdist
+
+	def rank_twitter_user(self, user_id, query, topic_vector):
+		"""
+			Given a query vector, calculate the ranking score for
+			the user with their inferred topic vector
+		"""
+		total = reduce(lambda x,y: x + topic_vector[y], topic_vector, 0)
+		sim_score = 0
+		topic_list = [topic for topic, freq in topic_vector.iteritems()]
+		from util import cover_density_ranking
+		ranked_docs = cover_density_ranking(query)
+		sim_score = sim_score * 1.0 / total
+		listed_count = self.get_listed_count_for_twitter_user(user_id)
+		import math
+		ranking_score = sim_score * math.log(listed_count)
+		return ranking_score
 
 class PeerRankError(Exception):
 	def __init__(self, value):
