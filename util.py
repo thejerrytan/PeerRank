@@ -108,7 +108,7 @@ def cover_density_ranking(q, doc_list):
 	while i >= 1:
 		y = level_rank(q, i)
 		for j, pair in enumerate(y):
-			print i, pair
+			# print i, pair
 			if y[j][0] not in z:
 				doc_count += 1
 				z.append(y[j][0])

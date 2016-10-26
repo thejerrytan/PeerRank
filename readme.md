@@ -32,13 +32,14 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 
 # Outstanding questions
 1. How to automate seeding of accounts in order to automatically discover new topics
-2. What if we change the analysis to start from Quora and find matching accounts on Twitter?
-3. How do we determine the activity of each user on a OSN
+2. What if we change the analysis to start from Quora and find matching accounts on Twitter? (Much faster and easier, because we are starting with experts on Quora and after we find the matching twitter account, we can follow Cognos methodology to arrive at expert ranking)
+3. How do we determine the activity of each user on a OSN (Activity on Quora, last updated on StackOverflow, )
 4. How to overcome IP based throttle limits imposed by SE
 5. How to increase overall throughput to process 3 mil users in 7 days (0.2s per user)? Now, it takes ~ 10s per user, 347 days in total
 
 # Issues
-1. How to ensure all topics on Quora are scraped. How to ensure new topics are covered?
+1. How to ensure all topics on Quora are scraped. How to ensure new topics are covered? (Alphabetical site map, not sure how often it is updated)
+2. How to maximize data extraction from Quora (Fast in, fast out)
 
 # Redis Schema
 ## DB - 0 (Twitter profiles)

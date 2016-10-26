@@ -729,9 +729,8 @@ class PeerRank:
 		topics = []
 		from nltk.util import ngrams
 		print("Generating unigram and bigram")
-		topics = list(ngrams(temp_token_doc, 1))
-		topics += list(ngrams(temp_token_doc, 2))
-		# topics = list(topics)
+		topics = set(ngrams(temp_token_doc, 1))
+		topics.update(set(ngrams(temp_token_doc, 2)))
 		pprint.pprint(topics)
 		print
 

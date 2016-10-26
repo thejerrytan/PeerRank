@@ -76,12 +76,12 @@ class Worker(threading.Thread):
 				self.cnx.commit()
 				self.cursor.execute("INSERT IGNORE INTO test.member_of (user_id, list_id) VALUES(%s, %s)", (user, l.id))
 				self.cnx.commit()
-				count.increment()
-				if count.value % 100 == 0:
-					print ("Progress : %d" % int(count.value))
-					with open('twitter_get_lists_for_user.txt', 'w') as f:
-						f.write(str(count.value))
-					f.close()
+			count.increment()
+			if count.value % 100 == 0:
+				print ("Progress : %d" % int(count.value))
+				with open('twitter_get_lists_for_user.txt', 'w') as f:
+					f.write(str(count.value))
+				f.close()
 		except tweepy.RateLimitError as e:
 			print e
 			time.sleep(60)
