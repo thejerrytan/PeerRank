@@ -2,7 +2,7 @@ from key import KeyManager
 from tweepy import OAuthHandler, API, Cursor
 from tweepy.error import TweepError
 from collections import deque
-import mysql.connector, math, sys, time, tweepy, threading, logging, json
+import mysql.connector, math, sys, time, tweepy, threading, logging, json, os
 
 ENV               = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
 MYSQL_HOST        = ENV['MYSQL_HOST']
