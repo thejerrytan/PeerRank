@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import pprint, sys, time, json, seed, random, httplib, logger, signal, urllib, os, socket
+import pprint, sys, time, json, seed, random, httplib, logger, signal, urllib, os, socket, math
 import jellyfish, redis, tweepy
 sys.path.append('./Py-StackExchange')
 import stackexchange
@@ -801,6 +801,7 @@ class PeerRank:
 		return fdist
 
 	def insert_topic_vector(self, user_id, topic_vector):
+		""" Inserts a topic_vector for a given user into the DB"""
 		json_str = json.dumps(topic_vector, ensure_ascii=False)
 		try:
 			# print json_str
@@ -810,20 +811,58 @@ class PeerRank:
 			print e
 			return False
 
+	def get_query_vector(self, query):
+		""" Given a raw user-input query, convert to query vector"""
+		from nltk import word_tokenize
+		tokenized_query = word_tokenize(query.strip())
+
+		from nltk.stem.snowball import SnowballStemmer
+		stemmer = SnowballStemmer('english')
+		tokenized_query = [stemmer.stem(x.lower()) for x in tokenized_query]
+		return ' '.join(tokenized_query)
+
+	def get_twitter_rankings(self, query):
+		""" For a query, return top 20 twitter experts"""
+		try:
+			a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+		query_vector = self.get_query_vector(query)
+
+		topic_vectors = [] # (topic_vector, user_id) tuple
+		start = time.time()
+		self.cursor.execute("SELECT topics, user_id from `test`.`twitter_topics_for_user` LIMIT 100")
+		for row in self.cursor:
+			topic_vectors.append((json.loads(row[0]), row[1]))
+		print("Time taken to fetch all users: %.2f " % (time.time() - start))
+
+		start = time.time()
+		rankings = [] # (user_id, score) tuple
+		for (topic_vector, user_id) in topic_vectors:
+			rankings.append((user_id, self.rank_twitter_user(user_id, query_vector, topic_vector)))
+		print("Time taken to rank: %.2f" % (time.time() - start))
+
+		start = time.time()
+		rankings.sort(key=lambda x: x[1])
+		print("Time taken to sort rankings: %.2f " % (time.time() - start))
+		return rankings
+
 	def rank_twitter_user(self, user_id, query, topic_vector):
 		"""
 			Given a query vector, calculate the ranking score for
 			the user with their inferred topic vector
 		"""
+		start = time.time()
 		total = reduce(lambda x,y: x + topic_vector[y], topic_vector, 0)
+		if total == 0:
+			return 0
 		sim_score = 0
 		topic_list = [topic for topic, freq in topic_vector.iteritems()]
-		from util import cover_density_ranking
-		ranked_docs = cover_density_ranking(query)
+		ranked_docs = cover_density_ranking(query, topic_list)
 		sim_score = sim_score * 1.0 / total
 		listed_count = self.get_listed_count_for_twitter_user(user_id)
-		import math
 		ranking_score = sim_score * math.log(listed_count)
+		print("Time taken to rank user %d : %.2f" % (user_id, (time.time() - start)))
 		return ranking_score
 
 class PeerRankError(Exception):
