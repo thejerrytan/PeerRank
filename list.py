@@ -747,6 +747,14 @@ class PeerRank:
 			temp_token_doc += matches
 		if verbose: pprint.pprint(temp_token_doc)
 
+		# Split on -, _ , /, .,\,|,(,),{,},,
+		if verbose: print("Separate DOT, DASH, SLASHES and UNDERSCORES")
+		token_doc = []
+		for token in temp_token_doc:
+			token_doc += re.split('\W+|_', token)
+		temp_token_doc = [x for x in token_doc if x != ''] # Remove empty strings
+		if verbose: pprint.pprint(temp_token_doc)
+
 		# Case-folding, stemming, stop-word removal
 		from nltk.stem.snowball import SnowballStemmer
 		from nltk.corpus import stopwords
@@ -784,7 +792,6 @@ class PeerRank:
 
 		# Convert tuples to string
 		topics = [reduce(lambda y,z : y + " " + z, x) for x in topics]
-		# if verbose: pprint.pprint(topics)
 
 		# Count frequency of occurence
 		from nltk import FreqDist

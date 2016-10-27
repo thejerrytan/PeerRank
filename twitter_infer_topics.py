@@ -28,7 +28,7 @@ class InferWorker(BaseWorker):
 			finally:
 				qlock.release()
 			if hasWork: 
-				topic_vector = self.pr.infer_twitter_topics(user)
+				topic_vector = self.pr.infer_twitter_topics(user, verbose=True)
 				self.pr.insert_topic_vector(user, topic_vector)
 				self.pr.sql.commit()
 				count.increment()
