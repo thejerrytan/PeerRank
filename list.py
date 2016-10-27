@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import pprint, sys, tweepy, jellyfish, time, redis, json, seed, random, httplib, logger, signal, urllib, os, socket
+import pprint, sys, time, json, seed, random, httplib, logger, signal, urllib, os, socket
+import jellyfish, redis, tweepy
 sys.path.append('./Py-StackExchange')
 import stackexchange
 from util import *
@@ -653,15 +654,51 @@ class PeerRank:
 
 		# For Twitter topics
 
-	def get_listed_count_for_twitter_user(self, user_id):
-		self.__init_sql_connection()
+	def close(self):
+		""" Close system resources"""
+		try:
+			print("Closing SQL connection...")
+			self.sql.close()
+		except AttributeError as e:
+			pass
+
+	def get_all_twitter_experts(self, so_far=0, close=False):
+		""" Get all twitter user_ids with listed_count > 10 from DB"""
+		try:
+			a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+		from collections import deque
+		users = deque([])
+		# num_experts = self.ENV['NUM_TWITTER_EXPERTS']
+		num_experts = 100
+
+		try:
+			self.cursor.execute("SET SESSION net_read_timeout = 3600")
+			self.cursor.execute("SELECT user_id FROM test.new_temp WHERE listed_count > 10 LIMIT %d OFFSET %d" % (num_experts, so_far))
+			for row in self.cursor:
+				users.append(int(row[0]))
+		except Exception as e:
+			print e
+		finally:
+			if close:
+				self.close()
+			return users
+
+	def get_listed_count_for_twitter_user(self, user_id, close=False):
+		try:
+			a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
 		self.cursor.execute("SELECT listed_count FROM test.new_temp WHERE user_id = %d" % (user_id))
+		if close:
+			self.close()
 		for row in self.cursor:
 			listed_count = row[0]
 			return listed_count
 		raise(PeerRankError("Cannot find user in database"))
 
-	def infer_twitter_topics(self, user_id):
+	def infer_twitter_topics(self, user_id, close=False, verbose=False):
 		""" 
 			For every Twitter expert identified, return a vector of <topics, frequency> using Cognos methodology
 			1. Separate CamelCase words into individual words
@@ -670,13 +707,17 @@ class PeerRank:
 			4. Group together words that are similar to each other based on edit-distance
 			5. Consider only unigram and bigrams as topics
 		"""
+		try:
+			a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+			
 		import re
 		def camel_case_split(identifier):
 			matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
 			return [m.group(0) for m in matches]
 
 		lists = []
-		self.__init_sql_connection()
 		self.cursor.execute("SELECT * FROM test.member_of WHERE user_id = %d" % (user_id))
 		for row in self.cursor:
 			lists.append(int(row[2]))
@@ -685,81 +726,90 @@ class PeerRank:
 			self.cursor.execute("SELECT name, description FROM test.lists WHERE list_id = %d LIMIT 1" % (l))
 			for row in self.cursor:
 				doc.append(unicode(row[0]) + ' ' + unicode(row[1]))
-		# print(doc)
+		if verbose: print(doc)
 
-		print("Tokenizing")
+		# Close SQL connection
+		if close:
+			self.close()
+
+		if verbose: print("Tokenizing")
 		from nltk.tokenize import TweetTokenizer
 		tokenizer = TweetTokenizer(strip_handles=True)
 		token_doc = []
 		for desc in doc:
 			token_doc += tokenizer.tokenize(desc)
-		# pprint.pprint(token_doc)
-		# print
+		# if verbose: pprint.pprint(token_doc)
 
 		# Separate CamelCase
 		temp_token_doc = []
-		print("Separate CamelCase")
+		if verbose: print("Separate CamelCase")
 		for token in token_doc:
 			matches = camel_case_split(token)
 			temp_token_doc += matches
-		# pprint.pprint(temp_token_doc)
-		# print
+		if verbose: pprint.pprint(temp_token_doc)
 
 		# Case-folding, stemming, stop-word removal
 		from nltk.stem.snowball import SnowballStemmer
 		from nltk.corpus import stopwords
 		stop = set(stopwords.words('english'))
 		stop.update(PeerRank.STOPWORDS)
-		print("Case folding, stemming and stop-word removal")
+		if verbose: print("Case folding, stemming and stop-word removal")
 		stemmer = SnowballStemmer('english')
 		token_doc = [stemmer.stem(x.lower()) for x in temp_token_doc if stemmer.stem(x.lower()) not in stop]
-		# pprint.pprint(token_doc)
-		# print
+		if verbose: pprint.pprint(token_doc)
 
 		# Identify nouns and adjectives
-		print("Identifying nouns and adjectives")
+		if verbose: print("Identifying nouns and adjectives")
 		from nltk import pos_tag
 		tagged_doc = pos_tag(token_doc)
 		temp_token_doc = [x[0] for x in tagged_doc if x[1] == 'NN' or x[1] == 'JJ']
-		# pprint.pprint(temp_token_doc)
-		# print
+		if verbose: pprint.pprint(temp_token_doc)
 
 		# Group similar words
-		# print("Group similar words together")
+		# if verbose: print("Group similar words together")
 		# from itertools import combinations
 		# for (w1, w2) in combinations(temp_token_doc, 2):
 		# 	score = jellyfish.jaro_winkler(unicode(w1), unicode(w2))
 		# 	if score > 0.8 and score < 1.0:
-				# print(w1, w2)
+				# if verbose: print(w1, w2)
 				# pass
-		# pprint.pprint(temp_token_doc)
-		# print
+		# if verbose: pprint.pprint(temp_token_doc)
 
 		# Finally, unigram and bigram as topics
 		topics = []
 		from nltk.util import ngrams
-		print("Generating unigram and bigram")
+		if verbose: print("Generating unigram and bigram")
 		topics = set(ngrams(temp_token_doc, 1))
 		topics.update(set(ngrams(temp_token_doc, 2)))
-		# pprint.pprint(topics)
-		# print
+		# if verbose: pprint.pprint(topics)
 
 		# Convert tuples to string
 		topics = [reduce(lambda y,z : y + " " + z, x) for x in topics]
-		# pprint.pprint(topics)
-		# print
+		# if verbose: pprint.pprint(topics)
 
 		# Count frequency of occurence
 		from nltk import FreqDist
-		print("Generating <topic, frequency> vector for user")
+		if verbose: print("Generating <topic, frequency> vector for user %d" % user_id)
 		#compute frequency distribution for all the ngrams in the text
 		fdist = FreqDist(topics)
 		for token in temp_token_doc:
 			fdist[token] += 1
-		# for k,v in fdist.items():
-			# print k,v
+		if verbose:
+			pass
+			# for k,v in fdist.items():
+				# print k,v
 
 		return fdist
+
+	def insert_topic_vector(self, user_id, topic_vector):
+		json_str = json.dumps(topic_vector, ensure_ascii=False)
+		try:
+			# print json_str
+			self.cursor.execute("INSERT INTO `test`.`twitter_topics_for_user` (user_id, topics) VALUES(%s, %s) ON DUPLICATE KEY UPDATE `topics`=%s, `last_updated`=CURRENT_TIMESTAMP", (str(user_id), json_str, json_str))
+			return True
+		except Exception as e:
+			print e
+			return False
 
 	def rank_twitter_user(self, user_id, query, topic_vector):
 		"""
