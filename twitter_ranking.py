@@ -2,7 +2,7 @@
 from list import PeerRank
 from util import cover_density_ranking
 from time import time
-import math
+import math, pprint
 
 def main():
 	pr        = PeerRank()
@@ -15,7 +15,7 @@ def main():
 		else:
 			start     = time()
 			rankings = pr.get_twitter_rankings(q)
-			print rankings
+			pprint.pprint(rankings)
 			print("Time taken %.2f" % (time() - start))
 
 if __name__ == "__main__":

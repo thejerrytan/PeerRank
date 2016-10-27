@@ -18,11 +18,12 @@ class Counter(object):
 
 class BaseWorker(threading.Thread):
 	
-	def __init__(self, users, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
+	def __init__(self, users, group=None, target=None, name=None, verbose=None, *args, **kwargs):
 		self.local  = threading.local()
 		self.pr     = PeerRank()
 		# self.pr.__init_sql_connection()
 		# self.pr.cursor.execute("SET SESSION net_read_timeout = 3600")
 		# self.pr.cursor.execute("SET SESSION net_write_timeout = 3600")
 		self.users  = users # shared resource
+		self.data   = kwargs # Other shared resources
 		threading.Thread.__init__(self, group=group, target=target, name=name, verbose=verbose)

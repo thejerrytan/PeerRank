@@ -800,6 +800,41 @@ class PeerRank:
 
 		return fdist
 
+	def build_inverted_index(self):
+		""" Build up a "word" -> [user_ids] inverted index"""
+		from nltk import word_tokenize
+		try:
+			_a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+
+		start = time.time()
+		topic_vectors = [] # (topic_vector, user_id) tuple
+		self.cursor.execute("SELECT topics, user_id from `test`.`twitter_topics_for_user` LIMIT 500000")
+		for row in self.cursor:
+			topic_vectors.append((json.loads(row[0]), row[1]))
+
+		inverted_index = {}
+		for (topic_vector, user_id) in topic_vectors:
+			topics = set()
+			for (sentence, freq) in topic_vector.iteritems():
+				topics.update(word_tokenize(sentence))
+			for t in topics:
+				try:
+					inverted_index[t].append(user_id)
+				except KeyError as e:
+					inverted_index[t] = [user_id]
+
+		# Write to DB
+		for (word, index) in inverted_index.iteritems():
+			json_list = json.dumps(index)
+			try:
+				self.cursor.execute("INSERT INTO `test`.`inverted_index` (word, doc_index) VALUES(%s, %s) ON DUPLICATE KEY UPDATE word=%s, doc_index=%s, last_updated=CURRENT_TIMESTAMP", (word, json_list, word, json_list))
+				self.sql.commit()
+			except Exception as e:
+				print e
+		print("Inverted index built in %.2f" % (time.time() - start))
+
 	def insert_topic_vector(self, user_id, topic_vector):
 		""" Inserts a topic_vector for a given user into the DB"""
 		json_str = json.dumps(topic_vector, ensure_ascii=False)
@@ -822,28 +857,70 @@ class PeerRank:
 		return ' '.join(tokenized_query)
 
 	def get_twitter_rankings(self, query):
-		""" For a query, return top 20 twitter experts"""
+		""" For a query, return top 20 twitter experts, multi-threaded implementation"""
+		from parallel import Counter, BaseWorker
+		import threading
+		
+		NUM_THREADS = 8
+		qlock = threading.Lock()
+		count = Counter(start=0)
+		class RankWorker(BaseWorker):
+			def run(self):
+				# Acquire qlock
+				hasWork = True
+				while hasWork:
+					qlock.acquire()
+					try:
+						if self.data['counter'].value < len(self.users):
+							(topic_vector, user_id) = self.users[self.data['counter'].value]
+							self.data['counter'].increment()
+						else:
+							hasWork = False
+					finally:
+						qlock.release()
+					if hasWork:
+						start = time.time()
+						rankings.append((user_id, self.pr.rank_twitter_user(user_id, self.data['query_vector'], topic_vector)))
+						print("Time taken to rank %d : %.2f" % (user_id, time.time() - start))
+
 		try:
-			a = self.sql
+			_a = self.sql
 		except AttributeError as e:
 			self.__init_sql_connection()
 		query_vector = self.get_query_vector(query)
 
-		topic_vectors = [] # (topic_vector, user_id) tuple
+		# Lookup inverted index
 		start = time.time()
-		self.cursor.execute("SELECT topics, user_id from `test`.`twitter_topics_for_user` LIMIT 100")
+		user_ids = []
+		query_tokens = query_vector.split(' ')
+		query_tokens_str = ','.join(query_tokens)
+		self.cursor.execute("SELECT doc_index FROM `test`.`inverted_index` WHERE word IN (%s)", (query_tokens_str,))
+		for row in self.cursor:
+			user_id_list = json.loads(row[0])
+			user_ids.extend(user_id_list)
+		print("Time taken to lookup inverted index : %.2f" % (time.time() - start))
+		print("No. of users to rank : %d" len(user_ids))
+		
+		start = time.time()
+		user_ids_str = ','.join(user_ids)
+		topic_vectors = []
+		self.cursor.execute("SELECT topics, user_id from `test`.`twitter_topics_for_user` WHERE user_id IN (%s) LIMIT 1000", (user_ids_str,))
 		for row in self.cursor:
 			topic_vectors.append((json.loads(row[0]), row[1]))
 		print("Time taken to fetch all users: %.2f " % (time.time() - start))
 
-		start = time.time()
-		rankings = [] # (user_id, score) tuple
-		for (topic_vector, user_id) in topic_vectors:
-			rankings.append((user_id, self.rank_twitter_user(user_id, query_vector, topic_vector)))
-		print("Time taken to rank: %.2f" % (time.time() - start))
+		# Multi-threading
+		threads = []
+		rankings = []
+		for i in range(0, NUM_THREADS):
+			thread = RankWorker(topic_vectors, query_vector=query_vector, counter=count)
+			threads.append(thread)
+			thread.start()
+		for t in threads:
+			t.join()
 
 		start = time.time()
-		rankings.sort(key=lambda x: x[1])
+		rankings.sort(key=lambda x: x[1], reverse=True)
 		print("Time taken to sort rankings: %.2f " % (time.time() - start))
 		return rankings
 
@@ -859,6 +936,8 @@ class PeerRank:
 		sim_score = 0
 		topic_list = [topic for topic, freq in topic_vector.iteritems()]
 		ranked_docs = cover_density_ranking(query, topic_list)
+		for rank, d in enumerate(ranked_docs):
+			sim_score += topic_vector[topic_list[d]]
 		sim_score = sim_score * 1.0 / total
 		listed_count = self.get_listed_count_for_twitter_user(user_id)
 		ranking_score = sim_score * math.log(listed_count)
