@@ -4,10 +4,10 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 from key import KeyManager
 from tweepy import OAuthHandler, API, Cursor
 from tweepy.error import TweepError
-import mysql.connector, math, requests, subprocess, shlex, sys, time, json, os
+import mysql.connector, math, requests, subprocess, shlex, sys, time, json, os, socket
 
 ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
-MYSQL_HOST = ENV['MYSQL_HOST']
+MYSQL_HOST = ENV['MYSQL_HOST'] if socket.gethostname() != ENV['INSTANCE_HOSTNAME'] else "localhost"
 MYSQL_USER = ENV['MYSQL_USER']
 MYSQL_PW   = ENV['MYSQL_PW']
 MYSQL_PORT = ENV['MYSQL_PORT']

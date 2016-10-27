@@ -1,10 +1,13 @@
-import mysql.connector
+import mysql.connector, json, os, socket
 
-MYSQL_HOST        = '104.198.155.210'
-MYSQL_USER        = 'root'
-MYSQL_PW          = 'root'
-cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', allow_local_infile=True)
-cursor            = cnx.cursor()
+ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
+MYSQL_HOST = ENV['MYSQL_HOST'] if socket.gethostname() != ENV['INSTANCE_HOSTNAME'] else "localhost"
+MYSQL_USER = ENV['MYSQL_USER']
+MYSQL_PW   = ENV['MYSQL_PW']
+MYSQL_PORT = ENV['MYSQL_PORT']
+MYSQL_DB   = ENV['MYSQL_DB']
+cnx        = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database=MYSQL_DB, allow_local_infile=True)
+cursor     = cnx.cursor()
 
 cursor.execute("SET autocommit = 0;")
 cursor.execute("SET unique_checks = 0;")

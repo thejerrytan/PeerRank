@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import pprint, sys, tweepy, jellyfish, time, redis, json, seed, random, httplib, logger, signal, urllib, os 
+import pprint, sys, tweepy, jellyfish, time, redis, json, seed, random, httplib, logger, signal, urllib, os, socket
 sys.path.append('./Py-StackExchange')
 import stackexchange
 from util import *
@@ -30,7 +30,7 @@ LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed sta
 
 class PeerRank:
 	ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
-	MYSQL_HOST = ENV['MYSQL_HOST']
+	MYSQL_HOST = ENV['MYSQL_HOST'] if socket.gethostname() != ENV['INSTANCE_HOSTNAME'] else "localhost"
 	MYSQL_USER = ENV['MYSQL_USER']
 	MYSQL_PW   = ENV['MYSQL_PW']
 	MYSQL_PORT = ENV['MYSQL_PORT']
