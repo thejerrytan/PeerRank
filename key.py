@@ -1,5 +1,6 @@
 import os, json
 from datetime import datetime
+from random import shuffle
 
 class ExceededTransactionLimitException(Exception):
 	def __init__(self, message, response):
@@ -24,6 +25,7 @@ class KeyManager:
 			self.dictRepr[key]['valid'] = True
 			self.dictRepr[key]['lastChecked'] = datetime.now()
 		self.arrRepr = [value for value in self.dictRepr.values()]
+		shuffle(self.arrRepr)
 		self.key     = self.arrRepr[0] if self.mode == 'arr' else self.dictRepr.itervalues().next()
 
 	# Test if key has exceeded daily transaction limit
