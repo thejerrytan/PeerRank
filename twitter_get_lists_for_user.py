@@ -74,9 +74,9 @@ class Worker(threading.Thread):
 		# Insert list
 		try:
 			for l in tweepy.Cursor(self.api.lists_memberships, id=user).items(2000):
-				self.cursor.execute("INSERT IGNORE INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s)", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at))
+				self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
 				self.cnx.commit()
-				self.cursor.execute("INSERT IGNORE INTO test.member_of (user_id, list_id) VALUES(%s, %s)", (user, l.id))
+				self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
 				self.cnx.commit()
 			count.increment()
 			if count.value % 100 == 0:
