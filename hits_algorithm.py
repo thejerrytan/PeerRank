@@ -1,14 +1,16 @@
-import mysql.connector, math, time, threading, logging
+import mysql.connector, math, time, threading, logging, json
 
+ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
+MYSQL_HOST = ENV['MYSQL_HOST']
+MYSQL_USER = ENV['MYSQL_USER']
+MYSQL_PW   = ENV['MYSQL_PW']
+MYSQL_PORT = ENV['MYSQL_PORT']
 ITERATIONS = 100
 iter_count = 0
-MYSQL_HOST = '104.198.155.210'
-MYSQL_USER = 'root'
-MYSQL_PW   = 'root'
 SO_FAR     = open('hits_algorithm.txt', 'r').readline()
 start      = int(SO_FAR.split(',')[0])
 skip       = int(SO_FAR.split(',')[1])
-cnx        = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
+cnx        = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database=MYSQL_DB, connection_timeout=3600)
 cursor     = cnx.cursor()
 TOTAL      = 1000000000
 PER_PAGE   = 1000000

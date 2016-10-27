@@ -4,16 +4,19 @@ from pyspark import SparkContext
 from pyspark.sql import SparkSession, Row
 from pyspark.sql import SQLContext
 from pyspark.sql.types import *
+import json
 
-MYSQL_USER     = 'root'
-MYSQL_PW       = 'root'
-MYSQL_TABLE    = 'new_temp'
+ENV                = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
+MYSQL_HOST         = ENV['MYSQL_HOST']
+MYSQL_USER         = ENV['MYSQL_USER']
+MYSQL_PW           = ENV['MYSQL_PW']
+MYSQL_PORT         = ENV['MYSQL_PORT']
 MYSQL_FOLLOW_TABLE = 'follows'
-MYSQL_DB       = 'test'
-# PATH_TO_DATA = "/Users/Jerry/Desktop/links1.txt"
-# PATH_TO_DATA = "/Volumes/Mac/data/links-anon.txt"
-PATH_TO_DATA   = "gs://peerrank-141304.appspot.com/data/links-anon.txt"
-PATH_TO_SPARK  = "gs://dataproc-6b80d17c-615b-4b31-adb7-be505aa9fd31-us/scripts/spark_import.py"
+MYSQL_DB           = ENV['MYSQL_DB']
+# PATH_TO_DATA     = "/Users/Jerry/Desktop/links1.txt"
+# PATH_TO_DATA     = "/Volumes/Mac/data/links-anon.txt"
+PATH_TO_DATA       = "gs://peerrank-141304.appspot.com/data/links-anon.txt"
+PATH_TO_SPARK      = "gs://dataproc-6b80d17c-615b-4b31-adb7-be505aa9fd31-us/scripts/spark_import.py"
 
 sc = SparkContext()
 sqlcontext = SQLContext(sc)
@@ -34,5 +37,4 @@ follower = distFile.map(lambda x: tuple(map(lambda y: int(y.strip('\n')), x.spli
 data = follower.map(lambda x: Row(follower=x[0], followee=x[1]))
 
 df = sqlcontext.createDataFrame(data, schema)
-# df.write.jdbc("jdbc:mysql://104.198.155.210:3306/test?user=root&password=root", MYSQL_TABLE, 'append', properties={"driver": 'com.mysql.jdbc.Driver'})
-df.write.jdbc("jdbc:mysql://104.198.155.210:3306/test?user=root&password=root", MYSQL_FOLLOW_TABLE, 'append', properties={"driver": 'com.mysql.jdbc.Driver'})
+df.write.jdbc("jdbc:mysql://%s:%s/%s?user=%s&password=%s" % (MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PW), MYSQL_FOLLOW_TABLE, 'append', properties={"driver": 'com.mysql.jdbc.Driver'})

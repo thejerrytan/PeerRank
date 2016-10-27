@@ -2,13 +2,15 @@ from key import KeyManager
 from tweepy import OAuthHandler, API, Cursor
 from tweepy.error import TweepError
 from collections import deque
-import mysql.connector, math, sys, time, tweepy, threading, logging
+import mysql.connector, math, sys, time, tweepy, threading, logging, json
 
-MYSQL_HOST        = '104.198.155.210'
-MYSQL_USER        = 'root'
-MYSQL_PW          = 'root'
+ENV               = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
+MYSQL_HOST        = ENV['MYSQL_HOST']
+MYSQL_USER        = ENV['MYSQL_USER']
+MYSQL_PW          = ENV['MYSQL_PW']
+MYSQL_PORT        = ENV['MYSQL_PORT']
 NUM_USERS         = 281699
-NO_THREADS        = 3
+NO_THREADS        = 5
 USERS_PER_PROCESS = math.ceil(NUM_USERS / NO_THREADS)
 SO_FAR            = int(open('twitter_get_lists_for_user.txt', 'r').readline())
 cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)

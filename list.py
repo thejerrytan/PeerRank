@@ -29,12 +29,13 @@ SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version
 LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed stale and a new crawl is required
 
 class PeerRank:
-	MYSQL_USER     = 'root'
-	MYSQL_PW       = 'root'
-	MYSQL_DB       = 'test'
-	# MYSQL_HOST     = '104.198.155.210'
-	MYSQL_HOST     = '104.198.155.210'
-	STOPWORDS      = ["Twitter", "List", "Formulist"]
+	ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
+	MYSQL_HOST = ENV['MYSQL_HOST']
+	MYSQL_USER = ENV['MYSQL_USER']
+	MYSQL_PW   = ENV['MYSQL_PW']
+	MYSQL_PORT = ENV['MYSQL_PORT']
+	MYSQL_DB   = ENV['MYSQL_DB']
+	STOPWORDS  = ["Twitter", "List", "Formulist"]
 	def __init__(self, se_site='stackoverflow.com'):
 		self.logger            = logger.Logger()
 		self.twitter_km        = KeyManager('Twitter-Search-v1.1', 'keys.json')

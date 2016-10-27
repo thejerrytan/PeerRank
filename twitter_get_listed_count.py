@@ -4,8 +4,13 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 from key import KeyManager
 from tweepy import OAuthHandler, API, Cursor
 from tweepy.error import TweepError
-import mysql.connector, math, requests, subprocess, shlex, sys, time
+import mysql.connector, math, requests, subprocess, shlex, sys, time, json
 
+ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
+MYSQL_HOST = ENV['MYSQL_HOST']
+MYSQL_USER = ENV['MYSQL_USER']
+MYSQL_PW   = ENV['MYSQL_PW']
+MYSQL_PORT = ENV['MYSQL_PORT']
 
 def get_users(query, km, retry=None):
 	data = []
@@ -56,7 +61,7 @@ def main():
 			process.append(subprocess.Popen(args, stdin=subprocess.PIPE))
 			print("Starting child process [%s]" % cmd)
 
-	cnx = mysql.connector.connect(user='root', password='root', host='104.198.155.210', database='test')
+	cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test')
 	cursor = cnx.cursor()
 	km = KeyManager('Twitter-Search-v1.1', 'keys.json')
 	key = km.get_key()
