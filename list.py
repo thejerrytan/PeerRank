@@ -834,6 +834,7 @@ class PeerRank:
 					inverted_index[t] = [user_id]
 
 		# Write to DB
+		size = len(inverted_index)
 		for (word, index) in inverted_index.iteritems():
 			json_list = json.dumps(index)
 			try:
@@ -841,6 +842,7 @@ class PeerRank:
 				count += 1
 				if count % 100 == 0:
 					self.sql.commit()
+					print("%d words to go..." % (size - count))
 			except Exception as e:
 				print e
 		print("Inverted index built in %.2f" % (time.time() - start))
