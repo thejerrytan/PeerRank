@@ -807,6 +807,7 @@ class PeerRank:
 			_a = self.sql
 		except AttributeError as e:
 			self.__init_sql_connection()
+		count = 0
 
 		start = time.time()
 		topic_vectors = [] # (topic_vector, user_id) tuple
@@ -830,7 +831,9 @@ class PeerRank:
 			json_list = json.dumps(index)
 			try:
 				self.cursor.execute("INSERT INTO `test`.`inverted_index` (word, doc_index) VALUES(%s, %s) ON DUPLICATE KEY UPDATE word=%s, doc_index=%s, last_updated=CURRENT_TIMESTAMP", (word, json_list, word, json_list))
-				self.sql.commit()
+				count += 1
+				if count % 100 == 0:
+					self.sql.commit()
 			except Exception as e:
 				print e
 		print("Inverted index built in %.2f" % (time.time() - start))
@@ -899,14 +902,16 @@ class PeerRank:
 			user_id_list = json.loads(row[0])
 			user_ids.extend(user_id_list)
 		print("Time taken to lookup inverted index : %.2f" % (time.time() - start))
-		print("No. of users to rank : %d" len(user_ids))
+		print("No. of users to rank : %d" % len(user_ids))
 		
 		start = time.time()
-		user_ids_str = ','.join(user_ids)
+		in_params = ', '.join(map(lambda x: '%s', user_ids))
+		stmt = "SELECT topics, user_id from `test`.`twitter_topics_for_user` WHERE user_id IN (%s) LIMIT 1000" % in_params
 		topic_vectors = []
-		self.cursor.execute("SELECT topics, user_id from `test`.`twitter_topics_for_user` WHERE user_id IN (%s) LIMIT 1000", (user_ids_str,))
-		for row in self.cursor:
-			topic_vectors.append((json.loads(row[0]), row[1]))
+		if len(user_ids) > 0:
+			self.cursor.execute(stmt, user_ids)
+			for row in self.cursor:
+				topic_vectors.append((json.loads(row[0]), row[1]))
 		print("Time taken to fetch all users: %.2f " % (time.time() - start))
 
 		# Multi-threading
