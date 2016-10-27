@@ -670,8 +670,7 @@ class PeerRank:
 			self.__init_sql_connection()
 		from collections import deque
 		users = deque([])
-		# num_experts = self.ENV['NUM_TWITTER_EXPERTS']
-		num_experts = 100
+		num_experts = self.ENV['NUM_TWITTER_EXPERTS']
 
 		try:
 			self.cursor.execute("SET SESSION net_read_timeout = 3600")
