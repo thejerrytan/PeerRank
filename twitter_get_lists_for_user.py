@@ -74,7 +74,6 @@ class Worker(threading.Thread):
 		# Insert list
 		try:
 			for l in tweepy.Cursor(self.api.lists_memberships, id=user).items(2000):
-				print l.name
 				self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
 				self.cnx.commit()
 				self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
@@ -87,7 +86,7 @@ class Worker(threading.Thread):
 				f.close()
 		except tweepy.RateLimitError as e:
 			print e
-			time.sleep(60)
+			time.sleep(30)
 			self.km.invalidate_key()
 			self.km.change_key()
 			self.api = authenticate(self.km.get_key())
@@ -97,7 +96,7 @@ class Worker(threading.Thread):
 		except TweepError as e:
 			print(e)
 			if type(e.message) is list and e.message[0]['code'] == 32: # Could not authenticate
-				time.sleep(60)
+				time.sleep(30)
 				self.km.invalidate_key()
 				self.km.change_key()
 				self.api = authenticate(self.km.get_key())
