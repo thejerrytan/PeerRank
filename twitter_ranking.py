@@ -10,11 +10,12 @@ def main():
 		print("Enter a query :")
 		print(">>>"),
 		q = raw_input()
+		q = unicode(q, 'utf-8')
 		if q == "exit":
 			break
 		else:
 			start     = time()
-			rankings = pr.get_twitter_rankings(q)
+			rankings = pr.get_twitter_rankings(q, include_so=True)
 			pprint.pprint(rankings)
 			print("Time taken %.2f" % (time() - start))
 

@@ -134,6 +134,8 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 	"site:topic3" -> Zset(<site:user1 : score>, <site:user4 : score>)
 	(Score is expertise measure on respective site - reputation for StackOverflow, views on Quora, lg(listed frequency) on Twitter)
 
+## DB - 7 Twitter user_id -> Screen_name lookup
+
 ## DB - 15 Utility (Used to help with scraping)
 	"quora:404" -> Set("https://www.quora.com/404.url", "https://www.quora.com/301.url")
 	"quora:topicUrls" -> Set("/sitemap/alphabetical_topics/jp")
