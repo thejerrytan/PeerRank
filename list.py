@@ -679,6 +679,7 @@ class PeerRank:
 						print("ERROR    user %s, listed_count %s" % (user_id, listed_count))
 						print e
 				except TweepError as e:
+					print("ERROR screen_name: %s " % twitter_screen_name)
 					print e
 		self.sql.commit()
 		if close:
