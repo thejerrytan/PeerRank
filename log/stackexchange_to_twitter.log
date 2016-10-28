@@ -1,8 +1,8 @@
 {
     "exception": "", 
-    "num_keys_processed": 73058, 
-    "time_started": 1472190222.187859, 
+    "num_keys_processed": 73220, 
+    "time_started": 1477599398.049811, 
     "process": "save_on_interrupt", 
-    "time_logged": 1472190521.359446, 
-    "time_terminated": 1472190521.359445
+    "time_logged": 1477599961.598043, 
+    "time_terminated": 1477599961.598042
 }

@@ -802,8 +802,8 @@ class PeerRank:
 			fdist[token] += 1
 		if verbose:
 			pass
-			# for k,v in fdist.items():
-				# print k,v
+			for k,v in fdist.items():
+				print k,v
 
 		return fdist
 
@@ -905,8 +905,9 @@ class PeerRank:
 		start = time.time()
 		user_ids = []
 		query_tokens = query_vector.split(' ')
-		query_tokens_str = ','.join(query_tokens)
-		self.cursor.execute("SELECT doc_index FROM `test`.`inverted_index` WHERE word IN (%s)", (query_tokens_str,))
+		in_params = ', '.join(map(lambda x: '%s', query_tokens))
+		stmt = "SELECT doc_index FROM `test`.`inverted_index` WHERE word IN (%s)" % in_params
+		self.cursor.execute(stmt, query_tokens)
 		for row in self.cursor:
 			user_id_list = json.loads(row[0])
 			user_ids.extend(user_id_list)

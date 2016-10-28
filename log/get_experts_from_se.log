@@ -1,8 +1,8 @@
 {
-    "exception": "TooManyRequestsError()More than 30 requests have been made in the last five seconds.", 
+    "exception": "", 
     "num_keys_processed": 94802, 
-    "time_started": 1473091582.931962, 
-    "process": "get_experts_from_se", 
-    "time_logged": 1473139440.834995, 
-    "time_terminated": 1473139440.834995
+    "time_started": 1477599045.209485, 
+    "process": "save_on_interrupt", 
+    "time_logged": 1477599054.242345, 
+    "time_terminated": 1477599054.242344
 }
