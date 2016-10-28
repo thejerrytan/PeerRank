@@ -54,7 +54,7 @@ class PeerRank:
 
 	def __init_sql_connection(self):
 		import mysql.connector
-		self.sql    = mysql.connector.connect(user=PeerRank.MYSQL_USER, password=PeerRank.MYSQL_PW, host=PeerRank.MYSQL_HOST, database=PeerRank.MYSQL_DB)
+		self.sql    = mysql.connector.connect(user=PeerRank.MYSQL_USER, password=PeerRank.MYSQL_PW, host=PeerRank.MYSQL_HOST, database=PeerRank.MYSQL_DB, charset='utf8mb4', collation='utf8mb4_general_ci', get_warnings=True)
 		self.cursor = self.sql.cursor()
 
 	def __init_twitter_api(self):

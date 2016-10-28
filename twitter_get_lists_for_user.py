@@ -39,13 +39,13 @@ def authenticate(key):
 
 def reconnect():
 	""" Create a new connection"""
-	cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
+	cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test',charset='utf8mb4', collation='utf8mb4_general_ci', get_warnings=True, connection_timeout=3600)
 	return (cnx.cursor(), cnx)
 
 class Worker(threading.Thread):
 	def __init__(self, users, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
 		self.local  = threading.local()
-		self.cnx    = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
+		self.cnx    = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', charset='utf8mb4', collation='utf8mb4_general_ci', get_warnings=True, connection_timeout=3600)
 		self.cursor = self.cnx.cursor()
 		self.cursor.execute("SET SESSION net_read_timeout = 3600")
 		self.cursor.execute("SET SESSION net_write_timeout = 3600")
