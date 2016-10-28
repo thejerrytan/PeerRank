@@ -682,18 +682,22 @@ class PeerRank:
 				except TweepError as e:
 					print("ERROR screen_name: %s " % twitter_screen_name)
 					print e
-				listed_count = twitter_user['listed_count']
+				try:
+					listed_count = twitter_user['listed_count']
+				except KeyError as e:
+					print e
+					listed_count = 0
 				user_id      = twitter_user['id']
 				twitter_user = self.serialize_and_flatten_twitter_user(twitter_user)
 				self.r.hmset(twitter_screen_name, twitter_user)
 				# Insert into MYSQL DB
-				try:
-					self.cursor.execute("INSERT INTO `test`.`new_temp` (user_id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s" , (user_id, listed_count, user_id, listed_count))
-					print("INSERTED user %s, listed_count %s" % (user_id, listed_count))
-				except Exception as e:
-					print("ERROR    user %s, listed_count %s" % (user_id, listed_count))
-					print e
-		self.sql.commit()
+				# try:
+				# 	self.cursor.execute("INSERT INTO `test`.`new_temp` (user_id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s" , (user_id, listed_count, user_id, listed_count))
+				# 	print("INSERTED user %s, listed_count %s" % (user_id, listed_count))
+				# except Exception as e:
+				# 	print("ERROR    user %s, listed_count %s" % (user_id, listed_count))
+				# 	print e
+		# self.sql.commit()
 		if close:
 			self.close()
 
