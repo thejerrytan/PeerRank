@@ -560,11 +560,11 @@ class PeerRank:
 
 	def count_matched_experts(self, site):
 		"""Returns count of matched experts for a given Site, and adds matched expert to matched_expert_set in respective db"""
-		if site == 'Quora':
+		if site.lower() == 'quora':
 			db = self.r_q_experts
 			key_namespace = 'quora:expert:*'
 			matched_experts_coll = 'quora:matched_experts_set'
-		elif site == 'StackExchange':
+		elif site.lower() == 'stackexchange':
 			db = self.r_se_experts
 			key_namespace = '*.com:*'
 			matched_experts_coll = 'set:stackexchange:matched_experts_set'
