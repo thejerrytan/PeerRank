@@ -666,13 +666,24 @@ class PeerRank:
 			_a = self.sql
 		except AttributeError as e:
 			self.__init_sql_connection()
-		
+		count = 0
 		for t in self.r_combined_topics.scan_iter():
 			site = t.split(':')[0]
 			for (expert, score) in self.r_combined_topics.zscan_iter(t):
 				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
 				try:
 					twitter_user = self.api.get_user(screen_name=twitter_screen_name)._json
+					try:
+						listed_count = twitter_user['listed_count']
+					except KeyError as e:
+						print e
+						listed_count = 0
+					user_id      = twitter_user['id']
+					twitter_user = self.serialize_and_flatten_twitter_user(twitter_user)
+					self.r.hmset(twitter_screen_name, twitter_user)
+					count += 1
+					if count % 100 == 0:
+						print("Progress: %d" % count)
 				except RateLimitError as e:
 					print e
 					self.twitter_km.invalidate_key()
@@ -682,14 +693,6 @@ class PeerRank:
 				except TweepError as e:
 					print("ERROR screen_name: %s " % twitter_screen_name)
 					print e
-				try:
-					listed_count = twitter_user['listed_count']
-				except KeyError as e:
-					print e
-					listed_count = 0
-				user_id      = twitter_user['id']
-				twitter_user = self.serialize_and_flatten_twitter_user(twitter_user)
-				self.r.hmset(twitter_screen_name, twitter_user)
 				# Insert into MYSQL DB
 				# try:
 				# 	self.cursor.execute("INSERT INTO `test`.`new_temp` (user_id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s" , (user_id, listed_count, user_id, listed_count))
@@ -995,27 +998,33 @@ class PeerRank:
 			print("Adjusting for StackOverflow contributions...")
 			start = time.time()
 			sim_topics = [] # list of (sim_score, list of (users, score)) tuples
+			so_max = 0
+			so_min = 100000
 			for t in self.r_combined_topics.scan_iter(match="stackexchange:*"):
 				# Calculate jaro-winkler sim score between original query str and topics
 				so_topic = t.split(':')[1].strip()
 				so_topic = unicode(so_topic, 'utf-8')
 				sim_score = jellyfish.jaro_winkler(so_topic, query)
 				if sim_score > 0.3:
-					experts = [x for x in self.r_combined_topics.zscan_iter(t)]
+					experts = []
+					for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
+						if reputation > so_max: so_max = reputation
+						if reputation < so_min: so_min = reputation
+						experts.append((expert, reputation))
 					sim_topics.append((sim_score, experts))
 			pprint.pprint(sim_topics)
 			# Convert stackoverflow username -> twitter_screen_name -> twitter_user_id
 			# Rescale every score to the max-min of twitter-rankings
-			so_max = max(sim_topics, key=lambda x: max(x[1], key=lambda y: y[1])) 
 			print("MAX: " + str(so_max))
-			so_min = min(sim_topics, key=lambda x: min(x[1], key=lambda y: y[1])) 
 			print("MIN: " + str(so_min))
 			twitter_rankings = []
 			for (score, experts) in sim_topics:
 				for (expert, reputation) in experts:
 					twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
 					twitter_user_id = self.r.hget(twitter_screen_name, "twitter_id")
-					print(twitter_screen_name, twitter_user_id)
+					# print(twitter_screen_name, twitter_user_id)
+
+
 			print("Time taken to adjust : %.2f " % (time.time() - start))
 
 		return rankings
