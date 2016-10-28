@@ -893,7 +893,6 @@ class PeerRank:
 					if hasWork:
 						start = time.time()
 						rankings.append((user_id, self.pr.rank_twitter_user(user_id, self.data['query_vector'], topic_vector)))
-						print("Time taken to rank %d : %.2f" % (user_id, time.time() - start))
 
 		try:
 			_a = self.sql
@@ -939,7 +938,7 @@ class PeerRank:
 		print("Time taken to sort rankings: %.2f " % (time.time() - start))
 		return rankings
 
-	def rank_twitter_user(self, user_id, query, topic_vector):
+	def rank_twitter_user(self, user_id, query, topic_vector, verbose=False):
 		"""
 			Given a query vector, calculate the ranking score for
 			the user with their inferred topic vector
@@ -956,7 +955,7 @@ class PeerRank:
 		sim_score = sim_score * 1.0 / total
 		listed_count = self.get_listed_count_for_twitter_user(user_id)
 		ranking_score = sim_score * math.log(listed_count)
-		print("Time taken to rank user %d : %.2f" % (user_id, (time.time() - start)))
+		if verbose: print("Time taken to rank user %d : %.2f" % (user_id, (time.time() - start)))
 		return ranking_score
 
 class PeerRankError(Exception):
