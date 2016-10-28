@@ -36,7 +36,7 @@ class PeerRank:
 	MYSQL_PW   = ENV['MYSQL_PW']
 	MYSQL_PORT = ENV['MYSQL_PORT']
 	MYSQL_DB   = ENV['MYSQL_DB']
-	STOPWORDS  = ["Twitter", "List", "Formulist"]
+	STOPWORDS  = ["Twitter", "List", "Formulist", "Follow", "Follow-back"]
 	def __init__(self, se_site='stackoverflow.com'):
 		self.logger            = logger.Logger()
 		self.twitter_km        = KeyManager('Twitter-Search-v1.1', 'keys.json')
@@ -653,6 +653,36 @@ class PeerRank:
 			pass
 
 		# For Twitter topics
+
+	def add_twitter_for_matched_experts(self, close=False):
+		""" Add twitter profile to DB for matched experts, if close, close sql connection at end"""
+		try:	
+			_a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+		
+		for t in self.r_combined_topics.scan_iter():
+			site = t.split(':')[0]
+			for (expert, score) in self.r_combined_topics.zscan_iter(t):
+				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
+				try:
+					twitter_user = self.api.get_user(screen_name=twitter_screen_name)._json
+					listed_count = twitter_user['listed_count']
+					user_id      = twitter_user['id']
+					twitter_user = self.serialize_and_flatten_twitter_user(twitter_user)
+					self.r.hmset(twitter_screen_name, twitter_user)
+					# Insert into MYSQL DB
+					try:
+						self.cursor.execute("INSERT INTO `test`.`new_temp` (user_id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s" , (user_id, listed_count, user_id, listed_count))
+						print("INSERTED user %s, listed_count %s" % (user_id, listed_count))
+					except Exception as e:
+						print("ERROR    user %s, listed_count %s" % (user_id, listed_count))
+						print e
+				except TweepError as e:
+					print e
+		self.sql.commit()
+		if close:
+			self.close()
 
 	def close(self):
 		""" Close system resources"""
