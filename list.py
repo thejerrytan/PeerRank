@@ -582,7 +582,7 @@ class PeerRank:
 		print "Total key count: %d" % num_keys
 		print "Total matched %s experts : %d in %.2fs" % (site, count, (time.time() - self.start_time))
 
-	def combined(self):
+	def combine_users(self):
 		""" Combine all linked accounts into 1 db, with site namespaced keys for O(1) retrieval """
 		for k in self.r.scan_iter():
 			so_display_name = self.r.hget(k, 'so_display_name')
@@ -649,10 +649,15 @@ class PeerRank:
 			self.count += 1
 
 		# For quora topics
-		for t in self.r_q_topics.scan_iter():
-			pass
-
-		# For Twitter topics
+		matched_quora_experts = self.r_q_experts.smembers("quora:matched_experts_set")
+		for expert in matched_quora_experts:
+			name    = expert.split(":")[2]
+			profile = self.r_q_experts.hgetall(expert)
+			topics  = self.r_q_experts.smembers("quora:topics:" + name)
+			q_name = "quora:" + name
+			for topic in topics:
+				# print (topic, q_name, float(profile['q_num_views']))
+				self.r_combined_topics.zadd("quora:" + topic, q_name, float(profile['q_num_views'])) # TODO - supposed to get views per topic, not from userprofile
 
 	def add_twitter_for_matched_experts(self, close=False):
 		""" Add twitter profile to DB for matched experts, if close, close sql connection at end"""

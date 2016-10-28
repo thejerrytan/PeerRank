@@ -2,7 +2,8 @@ from list import PeerRank
 
 def main():
 	pr = PeerRank()
-	pr.combined()
+	pr.combine_users()
+	pr.combine_topics()
 
 if __name__ == "__main__":
 	main()
