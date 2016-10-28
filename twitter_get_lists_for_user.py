@@ -32,6 +32,7 @@ class Counter(object):
 
 count = Counter(start=SO_FAR)
 def authenticate(key):
+	print(key)
 	auth = OAuthHandler(key['consumer_key'], key['consumer_secret'])
 	auth.set_access_token(key['access_token_key'], key['access_token_secret'])
 	api = API(auth_handler=auth, wait_on_rate_limit=False, wait_on_rate_limit_notify=True)
