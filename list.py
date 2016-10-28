@@ -656,7 +656,7 @@ class PeerRank:
 			topics  = self.r_q_experts.smembers("quora:topics:" + name)
 			q_name = "quora:" + name
 			for topic in topics:
-				# print (topic, q_name, float(profile['q_num_views']))
+				print (topic, q_name, float(profile['q_num_views']))
 				self.r_combined_topics.zadd("quora:" + topic, q_name, float(profile['q_num_views'])) # TODO - supposed to get views per topic, not from userprofile
 
 	def add_twitter_for_matched_experts(self, close=False):
