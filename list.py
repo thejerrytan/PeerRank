@@ -1057,8 +1057,6 @@ class PeerRank:
 			so_min = float(100000)
 			topic_docs = []
 			experts = []
-			so_min = 100000
-			so_max = 0
 			for t in self.r_combined_topics.scan_iter(match="stackexchange:* %s*" % (query,)):
 				for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
 					if reputation > so_max: so_max = reputation
