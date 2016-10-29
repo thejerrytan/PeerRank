@@ -45,23 +45,28 @@ class KeyManager:
 		self.key['lastChecked'] = datetime.now()
 
 	def change_key(self):
+		""" Change key and prints number of valid keys left"""
+		count = 0
 		if self.mode == 'arr':
 			for key in self.arrRepr:
 				# mark current apikey as invalid
 				if self.__is_current_key(key):
 					key['valid']       = False
 					key['lastChecked'] = datetime.now()
-				# reset invalid keys to valid if time since lastChecked is > 8 hours
+				# reset invalid keys to valid if time since lastChecked is > renew
 				if not key['valid']:
 					tdelta = datetime.now() - key['lastChecked']
 					if tdelta.seconds > self.renewal_time:
 						key['valid'] = True
 
 			# change to the next valid key
+			switched = False
 			for key in self.arrRepr:
 				if key['valid']:
-					self.key = key
-					break
+					count += 1
+					if not switched:
+						self.key = key
+						switched = True
 		else:
 			for value in self.dictRepr.itervalues():
 				if self.__is_current_key(value):
@@ -71,11 +76,15 @@ class KeyManager:
 					tdelta = datetime.now() - value['lastChecked']
 					if tdelta.seconds > self.renewal_time:
 						value['valid'] = True
+			switched = False
 			for value in self.dictRepr.itervalues():
 				if value['valid']:
-					self.key = value
-					break
-		print "changed key"
+					count += 1
+					if not switched:
+						self.key = value
+						switched = True
+
+		print("%s changed key, valid keys remaining: %d" % (self.api, count))
 
 	def __is_current_key(self, key):
 		return True if self.key == key else False
