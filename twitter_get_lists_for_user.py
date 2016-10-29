@@ -9,8 +9,8 @@ MYSQL_HOST        = ENV['MYSQL_HOST'] if socket.gethostname() != ENV['INSTANCE_H
 MYSQL_USER        = ENV['MYSQL_USER']
 MYSQL_PW          = ENV['MYSQL_PW']
 MYSQL_PORT        = ENV['MYSQL_PORT']
-NUM_USERS         = 281699
-NO_THREADS        = 5
+NUM_USERS         = 500000
+NO_THREADS        = 20
 USERS_PER_PROCESS = math.ceil(NUM_USERS / NO_THREADS)
 SO_FAR            = int(open('twitter_get_lists_for_user.txt', 'r').readline())
 cnx               = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PW, host=MYSQL_HOST, database='test', connection_timeout=3600)
@@ -32,7 +32,6 @@ class Counter(object):
 
 count = Counter(start=SO_FAR)
 def authenticate(key):
-	print(key)
 	auth = OAuthHandler(key['consumer_key'], key['consumer_secret'])
 	auth.set_access_token(key['access_token_key'], key['access_token_secret'])
 	api = API(auth_handler=auth, wait_on_rate_limit=False, wait_on_rate_limit_notify=True)
@@ -88,7 +87,7 @@ class Worker(threading.Thread):
 				f.close()
 		except tweepy.RateLimitError as e:
 			print e
-			time.sleep(30)
+			time.sleep(5)
 			self.km.invalidate_key()
 			self.km.change_key()
 			self.api = authenticate(self.km.get_key())
@@ -98,7 +97,7 @@ class Worker(threading.Thread):
 		except TweepError as e:
 			print(e)
 			if type(e.message) is list and e.message[0]['code'] == 32: # Could not authenticate
-				time.sleep(30)
+				time.sleep(5)
 				self.km.invalidate_key()
 				self.km.change_key()
 				self.api = authenticate(self.km.get_key())
@@ -118,7 +117,7 @@ def main():
 	print("Starting with: %d " % SO_FAR)
 	try:
 		cursor.execute("SET SESSION net_read_timeout = 3600")
-		cursor.execute("SELECT user_id FROM test.new_temp WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
+		cursor.execute("SELECT user_id FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
 		cnx.close()
 		for row in cursor:
 			users.append(int(row[0]))
