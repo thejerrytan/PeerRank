@@ -1,0 +1,50 @@
+<!doctype html>
+<head>
+  <title>PeerRank</title>
+  <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
+  <link rel=stylesheet type=text/css href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://use.fontawesome.com/a9bfcaf5af.js"></script>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-md-12">
+        <h1 class="center"><strong>PeerRank</strong> - <small><i> Finding topical authorities across Twitter, Quora and StackOverflow!</i></small></h1>
+      </div>
+    </div>
+    <div class="row" style="margin-top:60px">
+      <div class="col-md-6 col-md-offset-3">
+        <div class="well" id="index-container">
+          <form class="form-inline" action="/search" method="get">
+            <div class="form-group">
+              <label class="sr-only" for="query">Topic</label>
+              <input type="text" name="q" {% if query is defined %}value="{{query}}" {% endif %} class="form-control" id="query-input" placeholder="query">
+            </div>
+            <button type="submit" class="btn btn-primary" value="submit">Search</button>
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" name="include_so" id="include-so" {% if include_so %}checked{% endif %}> Include <i class="fa fa-stack-overflow" aria-hidden="true"></i>
+              </label>
+            </div>
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" name="include_q" id="include-so" {% if include_q %}checked{% endif %}> Include <i class="fa fa-quora" aria-hidden="true"></i>
+              </label>
+            </div>
+          </form>
+          <div class="results" id="results-container">
+            {% if query %}
+              <h3> Search results for: "{{ query }}"</h3>
+              <p> {{ num_results }} returned in {{ "%.2f" |format(time_taken) }} s</p>
+              <hr/>
+            {% endif %}
+            <!-- your results here !-->
+            {% for x in results %}
+              {% include 'expert.html' %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>

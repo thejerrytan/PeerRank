@@ -1,0 +1,22 @@
+body {
+	background-image: url('bg-clouds.png');
+	background-attachment: fixed;
+	background-repeat: no-repeat;
+	background-color: #C0DEED !important;
+	font-family: "Georgia, Utopia, Palatino, 'Palatino Linotype', serif" !important;
+	font-size: 15px !important;
+}
+
+h1 {
+	font-size: 200% !important;
+	color: #527BBD !important;
+}
+
+h1.center {
+	text-align: center;
+}
+
+.twitter-expert {
+	margin-top: 5px;
+	margin-bottom: 5px;
+}

@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 import pprint, sys, time, json, seed, random, httplib, logger, signal, urllib, os, socket, math
 import jellyfish, redis, tweepy
-sys.path.append('./Py-StackExchange')
+sys.path.append(os.path.join(os.path.dirname(__file__), 'Py-StackExchange'))
 import stackexchange
 from util import *
-from skimage.transform import *
+# from skimage.transform import *
 from skimage.io import *
 from image_match.goldberg import ImageSignature
 # from matplotlib import pyplot as plt
@@ -13,23 +13,22 @@ from tweepy.error import TweepError
 from tweepy.error import RateLimitError
 from tweepy import OAuthHandler, API, Cursor
 from urllib2 import HTTPError, URLError
-from collections import deque
+# from collections import deque
 from key import KeyManager
 
-DEVELOPERS_THRES    = 100
-NAME_SEARCH_FILTER  = 10
-NAME_JARO_THRES     = 0.80
-LOC_JARO_THRES      = 0.90
-IMG_SIM_THRES       = 0.50
-TOTAL_MATCHED_ACC   = 0
-
-# SO_CLIENT_SECRET  = 'AjN*KCYPu9qFontnH1T7Fw(('
-# SO_CLIENT_KEY     = 'PlqChK)JFcqzNx23OZe30Q((' # LIVE version
-SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version 
-
-LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed stale and a new crawl is required
-
 class PeerRank:
+	DEVELOPERS_THRES    = 100
+	NAME_SEARCH_FILTER  = 10
+	NAME_JARO_THRES     = 0.80
+	LOC_JARO_THRES      = 0.90
+	IMG_SIM_THRES       = 0.50
+	TOTAL_MATCHED_ACC   = 0
+
+	# SO_CLIENT_SECRET  = 'AjN*KCYPu9qFontnH1T7Fw(('
+	# SO_CLIENT_KEY     = 'PlqChK)JFcqzNx23OZe30Q((' # LIVE version
+	SO_CLIENT_KEY       = '4wBVVG2jcCrwIUbUZjHlEQ((' # DEV version 
+
+	LAST_CRAWL_INTERVAL = 0 # Duration since last crawl such that data is deemed stale and a new crawl is required
 	ENV        = json.loads(open(os.path.join(os.path.dirname(__file__), 'env.json')).read())
 	MYSQL_HOST = ENV['MYSQL_HOST'] if socket.gethostname() != ENV['INSTANCE_HOSTNAME'] else "localhost"
 	MYSQL_USER = ENV['MYSQL_USER']
@@ -40,7 +39,7 @@ class PeerRank:
 	def __init__(self, se_site='stackoverflow.com'):
 		self.logger            = logger.Logger()
 		self.twitter_km        = KeyManager('Twitter-Search-v1.1', 'keys.json')
-		self.so                = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
+		self.so                = stackexchange.Site(se_site, PeerRank.SO_CLIENT_KEY, impose_throttling=True)
 		self.__init_twitter_api()
 		self.r                 = redis.Redis(db=0)
 		self.r_tags            = redis.Redis(db=1)
@@ -93,7 +92,7 @@ class PeerRank:
 				loc_sim = 0
 			matches[i] = (u, img_sim, loc_sim)
 		matches = sorted(matches, cmp=lambda x, y: cmp(x[1], y[1]))
-		matches = filter(lambda x: x[1] < IMG_SIM_THRES, matches)
+		matches = filter(lambda x: x[1] < PeerRank.IMG_SIM_THRES, matches)
 		return matches[0][0] if len(matches) == 1 else None
 
 	def is_matching_twitter_profile(self, twitter_user, src_user):
@@ -116,7 +115,7 @@ class PeerRank:
 				loc_sim = self.compare_location(twitter_user['location'], src_user['location'])
 				print "       LOC_SIM : %.2f" % loc_sim
 			print
-			return True if img_sim < IMG_SIM_THRES else False
+			return True if img_sim < PeerRank.IMG_SIM_THRES else False
 		print
 		return False
 
@@ -160,17 +159,17 @@ class PeerRank:
 			print e
 			matches = []
 		result = []
-		if len(matches) < NAME_SEARCH_FILTER:
+		if len(matches) < PeerRank.NAME_SEARCH_FILTER:
 			for m in matches:
 				score = jellyfish.jaro_winkler(unicode(name, "utf-8"), m.display_name)
-				if score > NAME_JARO_THRES:
+				if score > PeerRank.NAME_JARO_THRES:
 					result.append(m)
 		return result
 
 	def compare_name_string_se(self, screen_name, so_name):
 		"""Compare name string for use when matching SE experts to Twitter accounts. Returns boolean"""
 		score = jellyfish.jaro_winkler(unicode(so_name, "utf-8"), screen_name)
-		return True if score > NAME_JARO_THRES else False
+		return True if score > PeerRank.NAME_JARO_THRES else False
 
 	def deserialize_twitter_user(self, twitter):
 		"""
@@ -259,7 +258,7 @@ class PeerRank:
 			# Process twitter account
 			r_acct = self.r.hgetall(k) # Remote account
 			r_user = {} 		  # Local account which we will push later on
-			if ('twitter_last_crawled' in r_acct and (time.time() - float(r_acct['twitter_last_crawled']))) >  LAST_CRAWL_INTERVAL:
+			if ('twitter_last_crawled' in r_acct and (time.time() - float(r_acct['twitter_last_crawled']))) >  PeerRank.LAST_CRAWL_INTERVAL:
 				# Update twitter user profile info
 				try:
 					user   = self.api.get_user(screen_name=k)
@@ -279,7 +278,7 @@ class PeerRank:
 			self.reset_start_time()
 			so_user = None
 			if len(r_acct) != 0:
-				if (r_acct['so_display_name'] == 'None' and 'so_last_crawled' not in r_acct) or (time.time() - float(r_acct['so_last_crawled'])) > LAST_CRAWL_INTERVAL:
+				if (r_acct['so_display_name'] == 'None' and 'so_last_crawled' not in r_acct) or (time.time() - float(r_acct['so_last_crawled'])) > PeerRank.LAST_CRAWL_INTERVAL:
 					twitter_acct = self.deserialize_twitter_user(r_acct)
 					try:
 						so_user = self.get_matching_so_profile(twitter_acct)
@@ -443,9 +442,9 @@ class PeerRank:
 			sys.exit(0)
 		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
 			signal.signal(sig, save_on_interrupt)
-		print "Name search filter              : %d"       % NAME_SEARCH_FILTER
-		print "Name jaro-winkler sim threshold : %.2f"     % NAME_JARO_THRES
-		print "Image similarity threshold      : %.2f"     % IMG_SIM_THRES
+		print "Name search filter              : %d"       % PeerRank.NAME_SEARCH_FILTER
+		print "Name jaro-winkler sim threshold : %.2f"     % PeerRank.NAME_JARO_THRES
+		print "Image similarity threshold      : %.2f"     % PeerRank.IMG_SIM_THRES
 		self.logger.open_log_file(sys._getframe().f_code.co_name)
 		skip = self.logger.get_value('num_keys_processed')
 		skip = 0 if skip is None else skip
@@ -458,7 +457,7 @@ class PeerRank:
 				print "Matching for StackExchange user: %s (%.2f)" % (user, self.count)
 				self.reset_start_time()
 				try:
-					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 1))[0:NAME_SEARCH_FILTER]:
+					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 1))[0:PeerRank.NAME_SEARCH_FILTER]:
 						u_hash = self.deserialize_so_user(self.r_se_experts.hgetall(user))
 						matches = []
 						print "    Possible candidate: %20s" % t_user.screen_name,
@@ -512,9 +511,9 @@ class PeerRank:
 			sys.exit(0)
 		for sig in (signal.SIGINT, signal.SIGSEGV, signal.SIGTERM):
 			signal.signal(sig, save_on_interrupt)
-		print "Name search filter              : %d"       % NAME_SEARCH_FILTER
-		print "Name jaro-winkler sim threshold : %.2f"     % NAME_JARO_THRES
-		print "Image similarity threshold      : %.2f"     % IMG_SIM_THRES
+		print "Name search filter              : %d"       % PeerRank.NAME_SEARCH_FILTER
+		print "Name jaro-winkler sim threshold : %.2f"     % PeerRank.NAME_JARO_THRES
+		print "Image similarity threshold      : %.2f"     % PeerRank.IMG_SIM_THRES
 		self.logger.open_log_file(sys._getframe().f_code.co_name)
 		skip = self.logger.get_value('num_keys_processed')
 		skip = 0 if skip is None else skip
@@ -527,7 +526,7 @@ class PeerRank:
 				print "Matching for Quora user: %s (%.2f)" % (user, self.count)
 				self.reset_start_time()
 				try:
-					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 2))[0:NAME_SEARCH_FILTER]:
+					for t_user in self.api.search_users(q=self.__get_namespace_from_key(user, 2))[0:PeerRank.NAME_SEARCH_FILTER]:
 						u_hash = self.deserialize_q_user(self.r_q_experts.hgetall(user))
 						matches = []
 						print "    Possible candidate: %20s" % t_user.screen_name,
@@ -724,7 +723,7 @@ class PeerRank:
 
 		try:
 			self.cursor.execute("SET SESSION net_read_timeout = 3600")
-			self.cursor.execute("SELECT user_id FROM test.new_temp WHERE listed_count > 10 LIMIT %d OFFSET %d" % (num_experts, so_far))
+			self.cursor.execute("SELECT user_id FROM test.new_temp WHERE listed_count > 10 LIMIT %d OFFSET %d" % (500000, so_far))
 			for row in self.cursor:
 				users.append(int(row[0]))
 		except Exception as e:
@@ -733,6 +732,62 @@ class PeerRank:
 			if close:
 				self.close()
 			return users
+
+	def populate_all_twitter_users(self):
+		users = self.get_all_twitter_experts()
+		from parallel import Counter, BaseWorker
+		import threading
+		NUM_THREADS = 20
+		qlock = threading.Lock()
+		count = Counter(start=0)
+		start = time.time()
+		class PopulateWorker(BaseWorker):
+			def run(self):
+				# Acquire qlock
+				hasWork = True
+				while hasWork:
+					qlock.acquire()
+					try:
+						if len(self.users) > 0:
+							i = 0
+							users_list = []
+							while i < 100 and len(self.users) > 0:
+								users_list.append(str(self.users.popleft()))
+								i += 1
+						else:
+							hasWork = False
+					finally:
+						qlock.release()
+					if hasWork:
+						self.pr.lookup_and_insert_twitter_accounts(users_list)
+						count.increment()
+						print("Processed users : %d" % count.value * 100)
+		threads = []
+		for i in range(0, NUM_THREADS):
+			t = PopulateWorker(users)
+			threads.append(t)
+			t.start()
+		for t in threads:
+			t.join()
+		print("Time taken : %.2f " % (time.time() - start))
+
+	def lookup_and_insert_twitter_accounts(self, user_ids):
+		""" Batch lookup twitter accounts and insert into MYSQL DB"""
+		try:
+			user_objs = self.api.lookup_users(user_ids=user_ids)
+			data = []
+			for u in user_objs:
+				data.append((u.name, u.screen_name, u.verified, u.profile_image_url, u.description, u.id))
+			stmt = """
+				UPDATE `test`.`new_temp` SET name=%s, screen_name=%s, verified=%s, profile_image_url=%s, description=%s WHERE user_id=%s
+			"""
+			try:
+				self.cursor.executemany(stmt, data)
+				self.sql.commit()
+			except Exception as e:
+				print e
+		except Exception as e:
+			print e
 
 	def get_listed_count_for_twitter_user(self, user_id, close=False):
 		try:
@@ -1036,7 +1091,7 @@ class PeerRank:
 				except KeyError as e:
 					merged_rankings.append((user_id, rank_score))
 			merged_rankings.sort(key=lambda x: x[1], reverse=True)
-			pprint.pprint(merged_rankings)
+			# pprint.pprint(merged_rankings)
 			print("Time taken to adjust : %.2f " % (time.time() - start))
 
 		return rankings
@@ -1078,9 +1133,9 @@ def main():
 		new_member = {"so_display_name" : None}
 		new_member.update(pr.serialize_and_flatten_twitter_user(pr.api.get_user(screen_name=x)._json))
 		pr.r.hmset(x, new_member)
-		print "Name search filter              : %d"       % NAME_SEARCH_FILTER
-		print "Name jaro-winkler sim threshold : %.2f"     % NAME_JARO_THRES
-		print "Image similarity threshold      : %.2f"     % IMG_SIM_THRES
+		print "Name search filter              : %d"       % PeerRank.NAME_SEARCH_FILTER
+		print "Name jaro-winkler sim threshold : %.2f"     % PeerRank.NAME_JARO_THRES
+		print "Image similarity threshold      : %.2f"     % PeerRank.IMG_SIM_THRES
 		print "Getting Twitter experts starting with : %s" % x
 		print ''
 		targeted_list = pr.search_similar_twitter_acct(x)
