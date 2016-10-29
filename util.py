@@ -27,7 +27,11 @@ def average_jaccard_sim(s):
 	return reduce(lambda x,y : x+y , map(lambda x : jaccard_sim(x[0], x[1]), pairwise_set(s)), 0) / len([x for x in pairwise_set(s)])
 
 def cover_density_ranking(q, doc_list):
-	"""Given a query q, and a document, return the cover density score ref:http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.12.1615&rep=rep1&type=pdf"""
+	"""
+		Given a query q, and a document, return a list of (document_index, score) sorted according to relevance
+		ref:http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.12.1615&rep=rep1&type=pdf
+
+	"""
 	def r(t, k, N, doc):
 		"""returns position of first occurence of term t at or after position k in the term sequence represented by doc"""
 		for index, term in enumerate(doc[k:]):
@@ -105,13 +109,15 @@ def cover_density_ranking(q, doc_list):
 	DOC_LIMIT = 20
 	i = len(q)
 	z = list()
+	added = []
 	while i >= 1:
 		y = level_rank(q, i)
 		for j, pair in enumerate(y):
-			# print i, pair
-			if y[j][0] not in z:
+			# print j, pair
+			if y[j][0] not in added:
 				doc_count += 1
-				z.append(y[j][0])
+				z.append(y[j])
+				added.append(y[j][0])
 			if doc_count == DOC_LIMIT:
 				return z
 		i = i-1
@@ -187,5 +193,5 @@ if __name__ == "__main__":
 	print "Query is: %s" % q1
 	doc_list = [doc.strip() for doc in doc_list]
 	ranked_docs = cover_density_ranking(q1, doc_list)
-	for rank, d in enumerate(ranked_docs):
-		print rank+1, doc_list[d]
+	for rank, (doc_index, score) in enumerate(ranked_docs):
+		print(rank+1, doc_list[doc_index], score)

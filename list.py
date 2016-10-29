@@ -992,39 +992,51 @@ class PeerRank:
 
 		if len(rankings) == 0: return rankings
 
-		max_score = max(rankings, key=lambda x: x[1])
-		min_score = min(rankings, key=lambda x: x[1])
+		max_score = max(rankings, key=lambda x: x[1])[1]
+		min_score = min(rankings, key=lambda x: x[1])[1]
+		twitter_range = max_score - min_score
 		if include_so:
 			print("Adjusting for StackOverflow contributions...")
 			start = time.time()
-			sim_topics = [] # list of (sim_score, list of (users, score)) tuples
-			so_max = 0
+			so_max = float(0)
+			so_min = float(100000)
+			topic_docs = []
+			experts = []
 			so_min = 100000
-			for t in self.r_combined_topics.scan_iter(match="stackexchange:*"):
-				# Calculate jaro-winkler sim score between original query str and topics
-				so_topic = t.split(':')[1].strip()
-				so_topic = unicode(so_topic, 'utf-8')
-				sim_score = jellyfish.jaro_winkler(so_topic, query)
-				if sim_score > 0.3:
-					experts = []
-					for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
-						if reputation > so_max: so_max = reputation
-						if reputation < so_min: so_min = reputation
-						experts.append((expert, reputation))
-					sim_topics.append((sim_score, experts))
-			pprint.pprint(sim_topics)
-			# Convert stackoverflow username -> twitter_screen_name -> twitter_user_id
-			# Rescale every score to the max-min of twitter-rankings
-			print("MAX: " + str(so_max))
-			print("MIN: " + str(so_min))
-			twitter_rankings = []
-			for (score, experts) in sim_topics:
-				for (expert, reputation) in experts:
-					twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
-					twitter_user_id = self.r.hget(twitter_screen_name, "twitter_id")
-					# print(twitter_screen_name, twitter_user_id)
+			so_max = 0
+			for t in self.r_combined_topics.scan_iter(match="stackexchange:* %s*" % (query,)):
+				for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
+					if reputation > so_max: so_max = reputation
+					if reputation < so_min: so_min = reputation
+					experts.append([expert, reputation])
+				t = t.split(':')[1]
+				topic_docs.append(t.replace('-', ' '))
+			ranked_docs = cover_density_ranking(query, topic_docs)
+			for rank, (index, score) in enumerate(ranked_docs):
+				experts[index][1] = score * experts[index][1] # Rescale reputation by cover density ranking score
 
+			rescaled_rankings = {}
+			so_range = so_max - so_min
+			for i, l in enumerate(experts):
+				expert = l[0]
+				reputation = l[1]
+				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
+				twitter_user_id = self.r.hget(twitter_screen_name, "twitter_id")
+				if twitter_user_id is not None:
+					rescaled_reputation = ((reputation - so_min) / so_range) * twitter_range + min_score
+					rescaled_rankings[int(twitter_user_id)] = rescaled_reputation
 
+			# Merge
+			merged_rankings = []
+			for (user_id, rank_score) in rankings:
+				# We are doing a simple weighted average - 0.5 from Twitter, 0.5 from StackOverflow
+				try:
+					merged_rankings.append((user_id, 0.5 * rank_score + 0.5 * rescaled_rankings[user_id]))
+					print("Score changed for user %d, twitter score: %.2f, stackoverflow score: %.2f" % (user_id, rank_score, rescaled_rankings[user_id]))
+				except KeyError as e:
+					merged_rankings.append((user_id, rank_score))
+			merged_rankings.sort(key=lambda x: x[1], reverse=True)
+			pprint.pprint(merged_rankings)
 			print("Time taken to adjust : %.2f " % (time.time() - start))
 
 		return rankings
@@ -1041,8 +1053,8 @@ class PeerRank:
 		sim_score = 0
 		topic_list = [topic for topic, freq in topic_vector.iteritems()]
 		ranked_docs = cover_density_ranking(query, topic_list)
-		for rank, d in enumerate(ranked_docs):
-			sim_score += topic_vector[topic_list[d]]
+		for rank, (index, score) in enumerate(ranked_docs):
+			sim_score += topic_vector[topic_list[index]]
 		sim_score = sim_score * 1.0 / total
 		listed_count = self.get_listed_count_for_twitter_user(user_id)
 		ranking_score = sim_score * math.log(listed_count)
