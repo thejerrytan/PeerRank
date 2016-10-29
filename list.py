@@ -1092,9 +1092,53 @@ class PeerRank:
 					merged_rankings.append((user_id, rank_score))
 			merged_rankings.sort(key=lambda x: x[1], reverse=True)
 			# pprint.pprint(merged_rankings)
-			print("Time taken to adjust : %.2f " % (time.time() - start))
+			print("Time taken to adjust StackOverflow: %.2f " % (time.time() - start))
+		
+		if include_q:
+			print("Adjusting for Quora contributions...")
+			start = time.time()
+			q_max = float(0)
+			q_min = float(100000)
+			q_topic_docs = []
+			q_experts = []
+			for t in self.r_combined_topics.scan_iter(match="quora:* %s*" % (query,)):
+				for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
+					if reputation > so_max: so_max = reputation
+					if reputation < so_min: so_min = reputation
+					q_experts.append([expert, reputation])
+				t = t.split(':')[1]
+				q_topic_docs.append(t)
+			ranked_docs = cover_density_ranking(query, q_topic_docs)
+			for rank, (index, score) in enumerate(ranked_docs):
+				q_experts[index][1] = score * q_experts[index][1] # Rescale reputation by cover density ranking score
 
-		return rankings
+			rescaled_rankings = {}
+			q_range = q_max - q_min
+			for i, l in enumerate(q_experts):
+				expert = l[0]
+				reputation = l[1]
+				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
+				twitter_user_id = self.r.hget(twitter_screen_name, "twitter_id")
+				if twitter_user_id is not None:
+					rescaled_reputation = ((reputation - q_min) / q_range) * twitter_range + min_score
+					rescaled_rankings[int(twitter_user_id)] = rescaled_reputation
+
+			# Merge
+			ref_rankings = merged_rankings if include_so else rankings
+			q_merged_rankings = []
+			for (user_id, rank_score) in ref_rankings:
+				# We are doing a simple weighted average - 0.5 from Twitter, 0.5 from Quora
+				try:
+					q_merged_rankings.append((user_id, 0.5 * rank_score + 0.5 * rescaled_rankings[user_id]))
+					print("Score changed for user %d, twitter score: %.2f, quora score: %.2f" % (user_id, rank_score, rescaled_rankings[user_id]))
+				except KeyError as e:
+					q_merged_rankings.append((user_id, rank_score))
+			q_merged_rankings.sort(key=lambda x: x[1], reverse=True)
+			pprint.pprint(q_merged_rankings)
+			print("Time taken to adjust Quora : %.2f " % (time.time() - start))
+			return q_merged_rankings
+		else:
+			return merged_rankings
 
 	def rank_twitter_user(self, user_id, query, topic_vector, verbose=False):
 		"""

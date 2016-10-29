@@ -23,9 +23,9 @@ def index():
 
 @app.route('/search', methods=['GET'])
 def search():
-	start = time.time()
-	query = unicode(request.args.get('q'))
-	include_so = True if request.args.get('include_so') is not None else False
+	start         = time.time()
+	query         = unicode(request.args.get('q'))
+	include_so    = True if request.args.get('include_so') is not None else False
 	include_quora = True if request.args.get('include_q') is not None else False
 	# results = pr.get_twitter_rankings(query, include_so=True)
 	results = {}

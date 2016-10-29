@@ -18,17 +18,17 @@
           <form class="form-inline" action="/search" method="get">
             <div class="form-group">
               <label class="sr-only" for="query">Topic</label>
-              <input type="text" name="q" {% if query is defined %}value="{{query}}" {% endif %} class="form-control" id="query-input" placeholder="query">
+              <input type="text" name="q" {% if query is defined %}value="{{query}}" {% endif %} class="form-control" id="query-input" placeholder="Enter a Short Query">
             </div>
             <button type="submit" class="btn btn-primary" value="submit">Search</button>
             <div class="checkbox">
-              <label>
-                <input type="checkbox" name="include_so" id="include-so" {% if include_so %}checked{% endif %}> Include <i class="fa fa-stack-overflow" aria-hidden="true"></i>
+              <label title="Include StackOverflow">
+                <input type="checkbox" title="Include StackOverflow" name="include_so" id="include-so" {% if include_so %}checked{% endif %}> Include <i class="fa fa-stack-overflow" aria-hidden="true"></i>
               </label>
             </div>
             <div class="checkbox">
-              <label>
-                <input type="checkbox" name="include_q" id="include-so" {% if include_q %}checked{% endif %}> Include <i class="fa fa-quora" aria-hidden="true"></i>
+              <label title="Include Quora">
+                <input type="checkbox" title="Include Quora" name="include_q" id="include-so" {% if include_q %}checked{% endif %}> Include <i class="fa fa-quora" aria-hidden="true"></i>
               </label>
             </div>
           </form>
