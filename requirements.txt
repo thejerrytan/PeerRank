@@ -22,3 +22,4 @@ chaussette
 selenium==2.53.6
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-2.0.5.tar.gz
 nltk==3.2.1
+flask
