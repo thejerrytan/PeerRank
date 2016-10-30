@@ -27,17 +27,16 @@ def search():
 	query         = unicode(request.args.get('q'))
 	include_so    = True if request.args.get('include_so') is not None else False
 	include_quora = True if request.args.get('include_q') is not None else False
-	# results = pr.get_twitter_rankings(query, include_so=True)
-	results = {}
-	time_taken = time.time() - start
-	num_results = len(results.keys())
+	results       = pr.get_twitter_rankings(query, include_so=False)
+	user_profiles = pr.batch_get_twitter_profile(results)
+	time_taken    = time.time() - start
+	num_results   = len(results)
 	context = {
 		'query' : query,
 		'include_so' : include_so,
 		'include_q' : include_quora,
 		'time_taken' : time_taken,
 		'num_results' : num_results,
-		'results' : results
+		'results' : user_profiles
 	}
-	# return render_template('index.html', results=results, query=query, num_results=num_results, time_taken=time_taken)
 	return render_template('index.html', **context)

@@ -760,11 +760,11 @@ class PeerRank:
 						qlock.release()
 					if hasWork:
 						self.pr.lookup_and_insert_twitter_accounts(users_list)
-						count.increment()
-						print("Processed users : %d" % count.value * 100)
+						self.data['counter'].increment()
+						print("Processed users : %d" % self.data['counter'].value * 100)
 		threads = []
 		for i in range(0, NUM_THREADS):
-			t = PopulateWorker(users)
+			t = PopulateWorker(users, counter=count)
 			threads.append(t)
 			t.start()
 		for t in threads:
@@ -773,6 +773,10 @@ class PeerRank:
 
 	def lookup_and_insert_twitter_accounts(self, user_ids):
 		""" Batch lookup twitter accounts and insert into MYSQL DB"""
+		try:
+			_a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
 		try:
 			user_objs = self.api.lookup_users(user_ids=user_ids)
 			data = []
@@ -791,7 +795,7 @@ class PeerRank:
 
 	def get_listed_count_for_twitter_user(self, user_id, close=False):
 		try:
-			a = self.sql
+			_a = self.sql
 		except AttributeError as e:
 			self.__init_sql_connection()
 		self.cursor.execute("SELECT listed_count FROM test.new_temp WHERE user_id = %d" % (user_id))
@@ -801,6 +805,33 @@ class PeerRank:
 			listed_count = row[0]
 			return listed_count
 		raise(PeerRankError("Cannot find user in database"))
+
+	def batch_get_twitter_profile(self, user_rankings):
+		""" Batch fetch twitter profiles for all user_ids (user_ids, score)"""
+		try:
+			_a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+		user_ids    = map(lambda x: x[0], user_rankings)
+		user_scores = map(lambda x: x[1], user_rankings)
+		in_params   = ', '.join(map(lambda x: '%s', user_ids))
+		stmt = "SELECT user_id, screen_name, name, description, verified, profile_image_url FROM `test`.`new_temp` WHERE user_id IN (%s)" % in_params
+		self.cursor.execute(stmt, user_ids)
+		user_profiles = {}
+		for row in self.cursor:
+			user_profiles[row[0]] = {
+				'user_id' : row[0],
+				'screen_name' : row[1],
+				'name' : row[2],
+				'description' : row[3],
+				'verified' : row[4],
+				'profile_image_url' : row[5]
+				}
+		# Add in ranking scores
+		for (user, score) in user_rankings:
+			user_profiles[user]['score'] = score
+		pprint.pprint(user_profiles.values())
+		return user_profiles.values()
 
 	def infer_twitter_topics(self, user_id, close=False, verbose=False):
 		""" 
@@ -1136,7 +1167,10 @@ class PeerRank:
 			print("Time taken to adjust Quora : %.2f " % (time.time() - start))
 			return q_merged_rankings
 		else:
-			return merged_rankings
+			if include_so:
+				return merged_rankings
+			else:
+				return rankings
 
 	def rank_twitter_user(self, user_id, query, topic_vector, verbose=False):
 		"""

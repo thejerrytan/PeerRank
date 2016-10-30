@@ -1,9 +1,9 @@
 <div class="twitter-expert">
 	<div class="row">
-		<div class="col-md-3">
-			<img src="{{ user['profile_image_url']}}" class="img-thumbnail">
+		<div class="col-md-2">
+			<img {% if user['profile_image_url'] == "None" %} src="static/twitter-default-img.png" %}{% else %} src="{{ user['profile_image_url']}}"{% endif %} class="img-thumbnail">
 		</div>
-		<div class="col-md-9">
+		<div class="col-md-10">
 			<p>
 				<a href="https://www.twitter.com/{{ user['screen_name']}}">{{ user['screen_name'] }}</a> : 
 				{{ user['name'] }}
