@@ -1191,7 +1191,7 @@ class PeerRank:
 		sim_score = sim_score * 1.0 / total
 		listed_count = self.get_listed_count_for_twitter_user(user_id)
 		if listed_count <= 0:
-			print("Error! Listed count is %d" % listed_count)
+			print("Error! Listed count is %d for %d" % (listed_count, user_id))
 			listed_count = 10
 		ranking_score = sim_score * math.log(listed_count)
 		if verbose: print("Time taken to rank user %d : %.2f" % (user_id, (time.time() - start)))
