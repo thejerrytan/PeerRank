@@ -812,26 +812,28 @@ class PeerRank:
 			_a = self.sql
 		except AttributeError as e:
 			self.__init_sql_connection()
-		user_ids    = map(lambda x: x[0], user_rankings)
-		user_scores = map(lambda x: x[1], user_rankings)
-		in_params   = ', '.join(map(lambda x: '%s', user_ids))
-		stmt = "SELECT user_id, screen_name, name, description, verified, profile_image_url FROM `test`.`new_temp` WHERE user_id IN (%s)" % in_params
-		self.cursor.execute(stmt, user_ids)
-		user_profiles = {}
-		for row in self.cursor:
-			user_profiles[row[0]] = {
-				'user_id' : row[0],
-				'screen_name' : row[1],
-				'name' : row[2],
-				'description' : row[3],
-				'verified' : row[4],
-				'profile_image_url' : row[5]
-				}
-		# Add in ranking scores
-		for (user, score) in user_rankings:
-			user_profiles[user]['score'] = score
-		pprint.pprint(user_profiles.values())
-		return user_profiles.values()
+		if len(user_rankings) > 0:
+			user_ids    = map(lambda x: x[0], user_rankings)
+			user_scores = map(lambda x: x[1], user_rankings)
+			in_params   = ', '.join(map(lambda x: '%s', user_ids))
+			stmt = "SELECT user_id, screen_name, name, description, verified, profile_image_url FROM `test`.`new_temp` WHERE user_id IN (%s)" % in_params
+			self.cursor.execute(stmt, user_ids)
+			user_profiles = {}
+			for row in self.cursor:
+				user_profiles[row[0]] = {
+					'user_id' : row[0],
+					'screen_name' : row[1],
+					'name' : row[2],
+					'description' : row[3],
+					'verified' : row[4],
+					'profile_image_url' : row[5]
+					}
+			# Add in ranking scores
+			for (user, score) in user_rankings:
+				user_profiles[user]['score'] = score
+			return user_profiles.values()
+		else:
+			return []
 
 	def infer_twitter_topics(self, user_id, close=False, verbose=False):
 		""" 
@@ -1163,7 +1165,7 @@ class PeerRank:
 				except KeyError as e:
 					q_merged_rankings.append((user_id, rank_score))
 			q_merged_rankings.sort(key=lambda x: x[1], reverse=True)
-			pprint.pprint(q_merged_rankings)
+			# pprint.pprint(q_merged_rankings)
 			print("Time taken to adjust Quora : %.2f " % (time.time() - start))
 			return q_merged_rankings
 		else:

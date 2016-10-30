@@ -27,7 +27,7 @@ def search():
 	query         = unicode(request.args.get('q'))
 	include_so    = True if request.args.get('include_so') is not None else False
 	include_quora = True if request.args.get('include_q') is not None else False
-	results       = pr.get_twitter_rankings(query, include_so=False)
+	results       = pr.get_twitter_rankings(query, include_so=include_so, include_q=include_quora)
 	user_profiles = pr.batch_get_twitter_profile(results)
 	time_taken    = time.time() - start
 	num_results   = len(results)
