@@ -661,6 +661,8 @@ class PeerRank:
 
 	def add_twitter_for_matched_experts(self, close=False):
 		""" Add twitter profile to DB for matched experts, if close, close sql connection at end"""
+		import codecs
+		codecs.register(lambda name: codecs.lookup('utf8') if name == 'utf8mb4' else None)
 		try:	
 			_a = self.sql
 		except AttributeError as e:
@@ -672,14 +674,10 @@ class PeerRank:
 				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
 				try:
 					twitter_user = self.api.get_user(screen_name=twitter_screen_name)._json
-					try:
-						listed_count = twitter_user['listed_count']
-					except KeyError as e:
-						print e
-						listed_count = 0
+					listed_count = twitter_user['listed_count']
 					user_id      = twitter_user['id']
-					twitter_user = self.serialize_and_flatten_twitter_user(twitter_user)
-					self.r.hmset(twitter_screen_name, twitter_user)
+					flattened_twitter_user = self.serialize_and_flatten_twitter_user(twitter_user)
+					self.r.hmset(twitter_screen_name, flattened_twitter_user)
 					count += 1
 					if count % 100 == 0:
 						print("Progress: %d" % count)
@@ -693,13 +691,13 @@ class PeerRank:
 					print("ERROR screen_name: %s " % twitter_screen_name)
 					print e
 				# Insert into MYSQL DB
-				# try:
-				# 	self.cursor.execute("INSERT INTO `test`.`new_temp` (user_id, listed_count) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s" , (user_id, listed_count, user_id, listed_count))
-				# 	print("INSERTED user %s, listed_count %s" % (user_id, listed_count))
-				# except Exception as e:
-				# 	print("ERROR    user %s, listed_count %s" % (user_id, listed_count))
-				# 	print e
-		# self.sql.commit()
+				try:
+					self.cursor.execute("INSERT INTO `test`.`new_temp` (user_id, listed_count, name, screen_name, verified, profile_image_url, description) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s, name=%s, screen_name=%s, verified=%s, profile_image_url=%s, description=%s" , (twitter_user['id'], twitter_user['listed_count'], twitter_user['name'], twitter_user['screen_name'], twitter_user['verified'], twitter_user['profile_image_url'], twitter_user['description'], twitter_user['id'], twitter_user['listed_count'], twitter_user['name'], twitter_user['screen_name'], twitter_user['verified'], twitter_user['profile_image_url'], twitter_user['description']))
+					self.sql.commit()
+					print("INSERTED user %s, listed_count %s" % (user_id, listed_count))
+				except Exception as e:
+					print("ERROR    user %s, listed_count %s" % (user_id, listed_count))
+					print e
 		if close:
 			self.close()
 
@@ -773,6 +771,8 @@ class PeerRank:
 
 	def lookup_and_insert_twitter_accounts(self, user_ids):
 		""" Batch lookup twitter accounts and insert into MYSQL DB"""
+		import codecs
+		codecs.register(lambda name: codecs.lookup('utf8') if name == 'utf8mb4' else None)
 		try:
 			_a = self.sql
 		except AttributeError as e:
@@ -781,15 +781,13 @@ class PeerRank:
 			user_objs = self.api.lookup_users(user_ids=user_ids)
 			data = []
 			for u in user_objs:
-				data.append((u.name, u.screen_name, u.verified, u.profile_image_url, u.description, u.id))
-			stmt = """
-				UPDATE `test`.`new_temp` SET name=%s, screen_name=%s, verified=%s, profile_image_url=%s, description=%s WHERE user_id=%s
-			"""
+				data.append((u.id, u.name, u.screen_name, u.verified, u.profile_image_url, u.description, u.id, u.name, u.screen_name, u.verified, u.profile_image_url, u.description))
+			stmt = "INSERT INTO `test`.`new_temp` (user_id, name, screen_name, verified, profile_image_url, description) VALUES(%s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE user_id=%s, name=%s, screen_name=%s, verified=%s, profile_image_url=%s, description=%s"
 			try:
 				self.cursor.executemany(stmt, data)
 				self.sql.commit()
 			except Exception as e:
-				print e
+				print "[MYSQL ERROR] " + str(e)
 		except Exception as e:
 			print e
 
@@ -807,11 +805,17 @@ class PeerRank:
 		raise(PeerRankError("Cannot find user in database"))
 
 	def batch_get_twitter_profile(self, user_rankings):
-		""" Batch fetch twitter profiles for all user_ids (user_ids, score)"""
+		""" Batch fetch twitter profiles for all user_ids (user_ids, score, flag)"""
 		try:
 			_a = self.sql
 		except AttributeError as e:
 			self.__init_sql_connection()
+		stats = {
+			'q_merged'  : 0,
+			'q_added'   : 0,
+			'so_merged' : 0,
+			'so_added'  : 0
+		}
 		if len(user_rankings) > 0:
 			user_ids    = map(lambda x: x[0], user_rankings)
 			user_scores = map(lambda x: x[1], user_rankings)
@@ -829,11 +833,35 @@ class PeerRank:
 					'profile_image_url' : row[5]
 					}
 			# Add in ranking scores
-			for (user, score) in user_rankings:
-				user_profiles[user]['score'] = score
-			return user_profiles.values()
+			for (user, score, flag) in user_rankings:
+				try:
+					user_profiles[user]['score'] = score
+					if flag == 0:
+						pass
+					elif flag == 1:
+						user_profiles[user]['is_merged_stackoverflow'] = True
+						stats['so_merged'] += 1
+						pprint.pprint(user_profiles[user])
+					elif flag == 2:
+						user_profiles[user]['is_added_stackoverflow'] = True
+						stats['so_added'] += 1
+						pprint.pprint(user_profiles[user])
+					elif flag == 3:
+						user_profiles[user]['is_merged_quora'] = True
+						stats['q_merged'] += 1
+						pprint.pprint(user_profiles[user])
+					elif flag == 4:
+						user_profiles[user]['is_added_quora'] = True
+						stats['q_added'] += 1
+						pprint.pprint(user_profiles[user])
+					else:
+						print("Error user %d, flag %d" % (user, flag))
+				except KeyError as e:
+					# Possibility of user not in our Database
+					print(e)
+			return (user_profiles.values(), stats)
 		else:
-			return []
+			return ([], stats)
 
 	def infer_twitter_topics(self, user_id, close=False, verbose=False):
 		""" 
@@ -1033,7 +1061,7 @@ class PeerRank:
 					finally:
 						qlock.release()
 					if hasWork:
-						rankings.append((user_id, self.pr.rank_twitter_user(user_id, self.data['query_vector'], topic_vector)))
+						rankings.append((user_id, self.pr.rank_twitter_user(user_id, self.data['query_vector'], topic_vector), 0))
 
 		try:
 			_a = self.sql
@@ -1090,7 +1118,7 @@ class PeerRank:
 			so_min = float(100000)
 			topic_docs = []
 			experts = []
-			for t in self.r_combined_topics.scan_iter(match="stackexchange:* %s*" % (query,)):
+			for t in self.r_combined_topics.scan_iter(match="stackexchange:*%s*" % (query,)):
 				for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
 					if reputation > so_max: so_max = reputation
 					if reputation < so_min: so_min = reputation
@@ -1109,20 +1137,25 @@ class PeerRank:
 				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
 				twitter_user_id = self.r.hget(twitter_screen_name, "twitter_id")
 				if twitter_user_id is not None:
-					rescaled_reputation = ((reputation - so_min) / so_range) * twitter_range + min_score
+					so_norm = 1 if so_range == 0 else ((reputation - so_min) / so_range)
+					rescaled_reputation = so_norm * twitter_range + min_score
 					rescaled_rankings[int(twitter_user_id)] = rescaled_reputation
 
 			# Merge
-			merged_rankings = []
-			for (user_id, rank_score) in rankings:
+			so_merged_rankings = []
+			for (user_id, rank_score, flag) in rankings:
 				# We are doing a simple weighted average - 0.5 from Twitter, 0.5 from StackOverflow
 				try:
-					merged_rankings.append((user_id, 0.5 * rank_score + 0.5 * rescaled_rankings[user_id]))
+					so_merged_rankings.append((user_id, 0.5 * rank_score + 0.5 * rescaled_rankings[user_id], 1)) # 1 to indicate merge with stackoverflow
 					print("Score changed for user %d, twitter score: %.2f, stackoverflow score: %.2f" % (user_id, rank_score, rescaled_rankings[user_id]))
+					del rescaled_rankings[user_id] # Remove key and value from rescaled_rankings
 				except KeyError as e:
-					merged_rankings.append((user_id, rank_score))
-			merged_rankings.sort(key=lambda x: x[1], reverse=True)
-			# pprint.pprint(merged_rankings)
+					so_merged_rankings.append((user_id, rank_score, flag)) # 0 to indicate unchanged
+			# Add unmerged values back to Twitter rankings
+			for (key, value) in rescaled_rankings.iteritems():
+				so_merged_rankings.append((key, value, 2)) # 2 to indicate added from StackOverflow
+			so_merged_rankings.sort(key=lambda x: x[1], reverse=True)
+			# pprint.pprint(so_merged_rankings)
 			print("Time taken to adjust StackOverflow: %.2f " % (time.time() - start))
 		
 		if include_q:
@@ -1132,7 +1165,7 @@ class PeerRank:
 			q_min = float(100000)
 			q_topic_docs = []
 			q_experts = []
-			for t in self.r_combined_topics.scan_iter(match="quora:* %s*" % (query,)):
+			for t in self.r_combined_topics.scan_iter(match="quora:*%s*" % (query,)):
 				for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
 					if reputation > so_max: so_max = reputation
 					if reputation < so_min: so_min = reputation
@@ -1151,26 +1184,31 @@ class PeerRank:
 				twitter_screen_name = self.r_combined.hget(expert, "twitter_screen_name")
 				twitter_user_id = self.r.hget(twitter_screen_name, "twitter_id")
 				if twitter_user_id is not None:
-					rescaled_reputation = ((reputation - q_min) / q_range) * twitter_range + min_score
+					q_norm = 1 if q_range == 0 else ((reputation - q_min) / q_range)
+					rescaled_reputation = q_norm * twitter_range + min_score
 					rescaled_rankings[int(twitter_user_id)] = rescaled_reputation
 
 			# Merge
-			ref_rankings = merged_rankings if include_so else rankings
+			ref_rankings = so_merged_rankings if include_so else rankings
 			q_merged_rankings = []
-			for (user_id, rank_score) in ref_rankings:
+			for (user_id, rank_score, flag) in ref_rankings:
 				# We are doing a simple weighted average - 0.5 from Twitter, 0.5 from Quora
 				try:
-					q_merged_rankings.append((user_id, 0.5 * rank_score + 0.5 * rescaled_rankings[user_id]))
+					q_merged_rankings.append((user_id, 0.5 * rank_score + 0.5 * rescaled_rankings[user_id], 3))
 					print("Score changed for user %d, twitter score: %.2f, quora score: %.2f" % (user_id, rank_score, rescaled_rankings[user_id]))
+					del rescaled_rankings[user_id]
 				except KeyError as e:
-					q_merged_rankings.append((user_id, rank_score))
+					q_merged_rankings.append((user_id, rank_score, flag))
+			# Add unmerged values back to Twitter rankings
+			for (key, value) in rescaled_rankings.iteritems():
+				q_merged_rankings.append((key, value, 4)) # 2 to indicate added from StackOverflow
 			q_merged_rankings.sort(key=lambda x: x[1], reverse=True)
 			# pprint.pprint(q_merged_rankings)
 			print("Time taken to adjust Quora : %.2f " % (time.time() - start))
 			return q_merged_rankings
 		else:
 			if include_so:
-				return merged_rankings
+				return so_merged_rankings
 			else:
 				return rankings
 

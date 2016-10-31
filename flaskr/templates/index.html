@@ -36,6 +36,20 @@
             {% if query %}
               <h3> Search results for: "{{ query }}"</h3>
               <p> {{ num_results }} returned in {{ "%.2f" |format(time_taken) }} s</p>
+              <p> 
+                {% if stats['so_merged'] > 0 %}
+                  {{ stats['so_merged'] }} merged from StackExchange,
+                {% endif %}
+                {% if stats['so_added'] > 0 %}
+                  {{ stats['so_added'] }} added from StackExchange,
+                {% endif %}
+                {% if stats['q_merged'] > 0 %}
+                  {{ stats['q_merged'] }} merged from Quora,
+                {% endif %}
+                {% if stats['q_added'] > 0 %}
+                  {{ stats['q_added'] }} added from Quora
+                {% endif %}
+              </p>
               <hr/>
             {% endif %}
             <!-- your results here !-->

@@ -10,6 +10,18 @@
 				{% if user['verified'] %}
 					<img src="static/verified.png">
 				{% endif %}
+				{% if user['is_added_stackoverflow'] %}
+					<span class="label label-success">Added <i class="fa fa-stack-overflow" aria-hidden="true"></i></span>
+				{% endif%}
+				{% if user['is_merged_stackoverflow'] %}
+					<span class="label label-info">Merged <i class="fa fa-stack-overflow" aria-hidden="true"></i></span>
+				{% endif%}
+				{% if user['is_added_quora'] %}
+					<span class="label label-success">Added <i class="fa fa-quora" aria-hidden="true"></i></span>
+				{% endif%}
+				{% if user['is_merged_quora'] %}
+					<span class="label label-info">Merged <i class="fa fa-quora" aria-hidden="true"></i></span>
+				{% endif%}
 			</p>
 			<p>{{ user['description'] }}</p>
 		</div>
