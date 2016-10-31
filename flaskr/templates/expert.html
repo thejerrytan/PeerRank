@@ -1,11 +1,11 @@
 <div class="twitter-expert">
 	<div class="row">
 		<div class="col-md-2">
-			<img {% if user['profile_image_url'] == "None" %} src="static/twitter-default-img.png" %}{% else %} src="{{ user['profile_image_url']}}"{% endif %} class="img-thumbnail">
+			<img title="{{ user['score'] }}" {% if user['profile_image_url'] == "None" %} src="static/twitter-default-img.png" %}{% else %} src="{{ user['profile_image_url']}}"{% endif %} class="img-thumbnail">
 		</div>
 		<div class="col-md-10">
 			<p>
-				<a href="https://www.twitter.com/{{ user['screen_name']}}">{{ user['screen_name'] }}</a> : 
+				<a target="_blank" href="https://www.twitter.com/{{ user['screen_name']}}">{{ user['screen_name'] }}</a> : 
 				{{ user['name'] }}
 				{% if user['verified'] %}
 					<img src="static/verified.png">
@@ -23,6 +23,16 @@
 					<span class="label label-info">Merged <i class="fa fa-quora" aria-hidden="true"></i></span>
 				{% endif%}
 			</p>
+			{% if user['is_added_stackoverflow'] or user['is_merged_stackoverflow'] %}
+				<p>
+					<a href="{{ user['so_url'] }}" target="_blank">{{ user['so_display_name'] }}</a> - Reputation : <span class="badge">{{ user['so_reputation'] }}</span>
+				</p>
+			{% endif %}
+			{% if user['is_added_quora'] or user['is_merged_quora'] %}
+				<p>
+					<a href="{{ user['q_url'] }}" target="_blank"> Quora: {{ user['q_name'] }}</a> - Views : <span class="badge">{{ user['q_num_views'] }}</span>
+				</p>
+			{% endif %}
 			<p>{{ user['description'] }}</p>
 		</div>
 	</div>

@@ -41,14 +41,14 @@ class PeerRank:
 		self.twitter_km        = KeyManager('Twitter-Search-v1.1', 'keys.json')
 		self.so                = stackexchange.Site(se_site, PeerRank.SO_CLIENT_KEY, impose_throttling=True)
 		self.__init_twitter_api()
-		self.r                 = redis.Redis(db=0)
-		self.r_tags            = redis.Redis(db=1)
-		self.r_se_experts      = redis.Redis(db=2)
-		self.r_q_topics        = redis.Redis(db=3)
-		self.r_q_experts       = redis.Redis(db=4)
-		self.r_combined        = redis.Redis(db=5)
-		self.r_combined_topics = redis.Redis(db=6)
-		self.r_twitter_lookup  = redis.Redis(db=7)
+		self.r                 = redis.Redis(db=0, decode_responses=True)
+		self.r_tags            = redis.Redis(db=1, decode_responses=True)
+		self.r_se_experts      = redis.Redis(db=2, decode_responses=True)
+		self.r_q_topics        = redis.Redis(db=3, decode_responses=True)
+		self.r_q_experts       = redis.Redis(db=4, decode_responses=True)
+		self.r_combined        = redis.Redis(db=5, decode_responses=True)
+		self.r_combined_topics = redis.Redis(db=6, decode_responses=True)
+		self.r_twitter_lookup  = redis.Redis(db=7, decode_responses=True)
 		self.total_matched     = 0
 		self.start_time        = time.time()
 
@@ -584,10 +584,10 @@ class PeerRank:
 
 	def combine_users(self):
 		""" Combine all linked accounts into 1 db, with site namespaced keys for O(1) retrieval """
-		for k in self.r.scan_iter():
-			so_display_name = self.r.hget(k, 'so_display_name')
-			if so_display_name is not None and so_display_name != "None":
-				self.r_combined.hmset("twitter:"+k, {"so_display_name" : so_display_name})
+		for k in self.r_se_experts.sscan_iter("set:stackexchange:matched_experts_set"):
+			twitter_screen_name = self.r_se_experts.hget(k, "twitter_screen_name")
+			if twitter_screen_name is not None:
+				self.r_combined.hmset("twitter:"+twitter_screen_name, {"so_display_name" : k})
 		for k in self.r_se_experts.scan_iter():
 			if not k.startswith("topics") and not k.startswith('set'):
 				twitter_screen_name = self.r_se_experts.hget(k, "twitter_screen_name")
@@ -792,6 +792,7 @@ class PeerRank:
 			print e
 
 	def get_listed_count_for_twitter_user(self, user_id, close=False):
+		""" Get listed count for a single user, deprecated in favor of batch fetch"""
 		try:
 			_a = self.sql
 		except AttributeError as e:
@@ -840,28 +841,65 @@ class PeerRank:
 						pass
 					elif flag == 1:
 						user_profiles[user]['is_merged_stackoverflow'] = True
+						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'stackoverflow'))
 						stats['so_merged'] += 1
 						pprint.pprint(user_profiles[user])
 					elif flag == 2:
 						user_profiles[user]['is_added_stackoverflow'] = True
+						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'stackoverflow'))
 						stats['so_added'] += 1
 						pprint.pprint(user_profiles[user])
 					elif flag == 3:
 						user_profiles[user]['is_merged_quora'] = True
 						stats['q_merged'] += 1
+						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'quora'))
 						pprint.pprint(user_profiles[user])
 					elif flag == 4:
 						user_profiles[user]['is_added_quora'] = True
 						stats['q_added'] += 1
+						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'quora'))
 						pprint.pprint(user_profiles[user])
 					else:
 						print("Error user %d, flag %d" % (user, flag))
 				except KeyError as e:
 					# Possibility of user not in our Database
 					print(e)
-			return (user_profiles.values(), stats)
+			# Return top 10 only
+			return (sorted(user_profiles.values(), key=lambda x: x['score'], reverse=True)[0:10], stats)
 		else:
 			return ([], stats)
+
+	def update_external_profile(self, screen_name, site):
+		""" Returns a user's profile on an external site"""
+		screen_name = unicode(screen_name).encode('utf-8')
+		if site == 'stackoverflow':
+			so_display_name = self.r_combined.hget(u"twitter:%s" % screen_name, "so_display_name")
+			(so_link, so_reputation) = self.r_se_experts.hmget(so_display_name, "so_link", "so_reputation")
+			so_profile = {
+				'so_url' : so_link.decode('utf-8'),
+				'so_display_name' : so_display_name.decode('utf-8'),
+				'so_reputation' : so_reputation.decode('utf-8')
+			}
+			return so_profile
+		elif site == 'quora':
+			q_username = self.r_combined.hget(u"twitter:%s" % screen_name, "quora_name")
+			(q_name, q_num_views) = self.r_q_experts.hmget("quora:expert:%s" % q_username, "q_name", "q_num_views")
+			try:
+				q_name = q_name.encode('utf-8', 'ignore')
+				q_name = q_name.decode('utf-8')
+			except UnicodeDecodeError as e:
+				print e
+			except UnicodeEncodeError as e:
+				print e
+			q_profile = {
+				'q_name' : q_name,
+				'q_num_views' : q_num_views.decode('utf-8'),
+				'q_url' : u"https://www.quora.com/profile/%s" % ('-'.join(q_name.split(' ')))
+			}
+			return q_profile
+		else:
+			pass
+			return {}
 
 	def infer_twitter_topics(self, user_id, close=False, verbose=False):
 		""" 
@@ -1061,7 +1099,12 @@ class PeerRank:
 					finally:
 						qlock.release()
 					if hasWork:
-						rankings.append((user_id, self.pr.rank_twitter_user(user_id, self.data['query_vector'], topic_vector), 0))
+						try:
+							listed_count = self.data['listed_count_hash'][user_id]
+						except KeyError as e:
+							print("Error getting listed count for user %d, using default of 10" % (user_id,))
+							listed_count = 10
+						rankings.append((user_id, self.pr.rank_twitter_user(user_id, listed_count, self.data['query_vector'], topic_vector), 0))
 
 		try:
 			_a = self.sql
@@ -1084,23 +1127,35 @@ class PeerRank:
 		
 		start = time.time()
 		in_params = ', '.join(map(lambda x: '%s', user_ids))
-		stmt = "SELECT topics, user_id from `test`.`twitter_topics_for_user` WHERE user_id IN (%s) LIMIT 1000" % in_params
+		stmt = "SELECT topics, user_id from `test`.`twitter_topics_for_user` WHERE user_id IN (%s) LIMIT 5000" % in_params
 		topic_vectors = []
 		if len(user_ids) > 0:
 			self.cursor.execute(stmt, user_ids)
 			for row in self.cursor:
-				topic_vectors.append((json.loads(row[0]), row[1]))
+				topic_vectors.append((json.loads(row[0]), int(row[1])))
 		print("Time taken to fetch all users: %.2f " % (time.time() - start))
+
+		# Batch fetch listed count for all users
+		listed_count_hash = {}
+		start = time.time()
+		stmt = "SELECT user_id, listed_count from `test`.`new_temp` WHERE user_id IN (%s) LIMIT 5000" % in_params
+		if len(user_ids) > 0:
+			self.cursor.execute(stmt, user_ids)
+			for row in self.cursor:
+				listed_count_hash[int(row[0])] = int(row[1])
+		print("Time taken to fetch listed count for all users: %.2f " % (time.time() - start))
 
 		# Multi-threading
 		threads = []
 		rankings = []
+		start = time.time()
 		for i in range(0, NUM_THREADS):
-			thread = RankWorker(topic_vectors, query_vector=query_vector, counter=count)
+			thread = RankWorker(topic_vectors, query_vector=query_vector, counter=count, listed_count_hash=listed_count_hash)
 			threads.append(thread)
 			thread.start()
 		for t in threads:
 			t.join()
+		print("Time taken to rank users: %.2f " % (time.time() - start))
 
 		start = time.time()
 		rankings.sort(key=lambda x: x[1], reverse=True)
@@ -1212,7 +1267,7 @@ class PeerRank:
 			else:
 				return rankings
 
-	def rank_twitter_user(self, user_id, query, topic_vector, verbose=False):
+	def rank_twitter_user(self, user_id, listed_count, query, topic_vector, verbose=False):
 		"""
 			Given a query vector, calculate the ranking score for
 			the user with their inferred topic vector
@@ -1227,7 +1282,6 @@ class PeerRank:
 		for rank, (index, score) in enumerate(ranked_docs):
 			sim_score += topic_vector[topic_list[index]]
 		sim_score = sim_score * 1.0 / total
-		listed_count = self.get_listed_count_for_twitter_user(user_id)
 		if listed_count <= 0:
 			print("Error! Listed count is %d for %d" % (listed_count, user_id))
 			listed_count = 10

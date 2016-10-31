@@ -126,7 +126,7 @@ Identifying topical experts on Twitter using information from StackOverflow and 
 ## DB - 5 Combined User (Used for fast lookup given a site and username, what are their linked accounts, if any)
 	"quora:username" -> Hash("twitter_screen_name": 'username')
 	"stackexchange:username" -> Hash("twitter_screen_name": 'username')
-	"twitter:username" -> Hash("so_display_name": 'username', "quora_name": 'username')
+	"twitter:username" -> Hash("so_display_name": 'site.stackexchange.com:username', "quora_name": 'username')
 
 ## DB - 6 Combined Topics (topic will be used for cover density ranking with user query)
 	"site:topic1" -> Zset(<site:user1 : score>, <site:user2: score>)

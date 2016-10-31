@@ -8,15 +8,6 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 pr = PeerRank()
 
-# Load default config and override config from an environment variable
-app.config.update(dict(
-	DATABASE=os.path.join(app.root_path, 'flaskr.db'),
-	SECRET_KEY='development key',
-	USERNAME='root',
-	PASSWORD='root'
-))
-app.config.from_envvar('FLASKR_SETTINGS', silent=True)
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
 	return render_template('index.html')
