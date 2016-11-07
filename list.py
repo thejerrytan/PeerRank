@@ -875,12 +875,15 @@ class PeerRank:
 		if site == 'stackoverflow':
 			so_display_name = self.r_combined.hget(u"twitter:%s" % screen_name, "so_display_name")
 			(so_link, so_reputation) = self.r_se_experts.hmget(so_display_name, "so_link", "so_reputation")
-			so_profile = {
-				'so_url' : so_link.encode('utf-8').decode('utf-8'),
-				'so_display_name' : so_display_name.encode('utf-8').decode('utf-8'),
-				'so_reputation' : so_reputation.encode('utf-8').decode('utf-8')
-			}
-			return so_profile
+			if so_link is not None and so_reputation is not None:
+				so_profile = {
+					'so_url' : so_link.encode('utf-8').decode('utf-8'),
+					'so_display_name' : so_display_name.encode('utf-8').decode('utf-8'),
+					'so_reputation' : so_reputation.encode('utf-8').decode('utf-8')
+				}
+				return so_profile
+			else:
+				return {}
 		elif site == 'quora':
 			q_username = self.r_combined.hget(u"twitter:%s" % screen_name, "quora_name")
 			(q_name, q_num_views) = self.r_q_experts.hmget("quora:expert:%s" % q_username, "q_name", "q_num_views")
