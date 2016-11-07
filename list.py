@@ -54,7 +54,7 @@ class PeerRank:
 
 	def __init_sql_connection(self):
 		import mysql.connector
-		self.sql    = mysql.connector.connect(user=PeerRank.MYSQL_USER, password=PeerRank.MYSQL_PW, host=PeerRank.MYSQL_HOST, database=PeerRank.MYSQL_DB, charset='utf8mb4', collation='utf8mb4_general_ci', get_warnings=True)
+		self.sql    = mysql.connector.connect(user=PeerRank.MYSQL_USER, password=PeerRank.MYSQL_PW, host=PeerRank.MYSQL_HOST, database=PeerRank.MYSQL_DB, charset='utf8mb4', collation='utf8mb4_general_ci', get_warnings=True, connection_timeout=3600)
 		self.cursor = self.sql.cursor()
 
 	def __init_twitter_api(self):
@@ -72,7 +72,7 @@ class PeerRank:
 		return new_tag
 
 	def change_se_site(self, se_site):
-		self.so = stackexchange.Site(se_site, SO_CLIENT_KEY, impose_throttling=True)
+		self.so = stackexchange.Site(se_site, PeerRank.SO_CLIENT_KEY, impose_throttling=True)
 
 	def print_time_taken_for_user(self, user):
 		print "Time taken for user: %20s %.2fs" % (user, (time.time() - self.start_time))
@@ -402,7 +402,7 @@ class PeerRank:
 						self.count += 1
 						continue
 					site_str = self.__get_namespace_from_key(t, 0)
-					site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
+					site = stackexchange.Site(site_str, PeerRank.SO_CLIENT_KEY, impose_throttling=True)
 					tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
 					topic = site_str.split('.')[0] + ' ' + tag.name
 					print "Getting top experts for: %s (%d)" % (tag.name, self.count)
@@ -623,7 +623,7 @@ class PeerRank:
 					self.count += 1
 					continue
 				site_str = self.__get_namespace_from_key(t, 0)
-				site = stackexchange.Site(site_str, SO_CLIENT_KEY, impose_throttling=True)
+				site = stackexchange.Site(site_str, PeerRank.SO_CLIENT_KEY, impose_throttling=True)
 				tag = stackexchange.models.Tag(self.r_tags.hgetall(t), site)
 				topic = site_str.split('.')[0] + ' ' + tag.name
 				print "Getting top experts for: %s (%d)" % (tag.name, self.count)
@@ -657,7 +657,7 @@ class PeerRank:
 			q_name = "quora:" + name
 			for topic in topics:
 				print (topic, q_name, float(profile['q_num_views']))
-				self.r_combined_topics.zadd("quora:" + topic, q_name, float(profile['q_num_views'])) # TODO - supposed to get views per topic, not from userprofile
+				self.r_combined_topics.zadd("quora:" + topic.lower(), q_name, float(profile['q_num_views'])) # TODO - supposed to get views per topic, not from userprofile
 
 	def add_twitter_for_matched_experts(self, close=False):
 		""" Add twitter profile to DB for matched experts, if close, close sql connection at end"""
@@ -865,7 +865,7 @@ class PeerRank:
 					# Possibility of user not in our Database
 					print(e)
 			# Return top 10 only
-			return (sorted(user_profiles.values(), key=lambda x: x['score'], reverse=True)[0:10], stats)
+			return (sorted(user_profiles.values(), key=lambda x: x['score'], reverse=True), stats)
 		else:
 			return ([], stats)
 
@@ -876,27 +876,30 @@ class PeerRank:
 			so_display_name = self.r_combined.hget(u"twitter:%s" % screen_name, "so_display_name")
 			(so_link, so_reputation) = self.r_se_experts.hmget(so_display_name, "so_link", "so_reputation")
 			so_profile = {
-				'so_url' : so_link.decode('utf-8'),
-				'so_display_name' : so_display_name.decode('utf-8'),
-				'so_reputation' : so_reputation.decode('utf-8')
+				'so_url' : so_link.encode('utf-8').decode('utf-8'),
+				'so_display_name' : so_display_name.encode('utf-8').decode('utf-8'),
+				'so_reputation' : so_reputation.encode('utf-8').decode('utf-8')
 			}
 			return so_profile
 		elif site == 'quora':
 			q_username = self.r_combined.hget(u"twitter:%s" % screen_name, "quora_name")
 			(q_name, q_num_views) = self.r_q_experts.hmget("quora:expert:%s" % q_username, "q_name", "q_num_views")
-			try:
-				q_name = q_name.encode('utf-8', 'ignore')
-				q_name = q_name.decode('utf-8')
-			except UnicodeDecodeError as e:
-				print e
-			except UnicodeEncodeError as e:
-				print e
-			q_profile = {
-				'q_name' : q_name,
-				'q_num_views' : q_num_views.decode('utf-8'),
-				'q_url' : u"https://www.quora.com/profile/%s" % ('-'.join(q_name.split(' ')))
-			}
-			return q_profile
+			if q_name is not None and q_num_views is not None:
+				try:
+					q_name = q_name.encode('utf-8', 'ignore')
+					q_name = q_name.decode('utf-8')
+				except UnicodeDecodeError as e:
+					print e
+				except UnicodeEncodeError as e:
+					print e
+				q_profile = {
+					'q_name' : q_name,
+					'q_num_views' : q_num_views.encode('utf-8').decode('utf-8'),
+					'q_url' : u"https://www.quora.com/profile/%s" % ('-'.join(q_name.split(' ')))
+				}
+				return q_profile
+			else:
+				return {}
 		else:
 			pass
 			return {}
@@ -1220,10 +1223,10 @@ class PeerRank:
 			q_min = float(100000)
 			q_topic_docs = []
 			q_experts = []
-			for t in self.r_combined_topics.scan_iter(match="quora:*%s*" % (query,)):
+			for t in self.r_combined_topics.scan_iter(match="quora:%s*" % (query,)):
 				for (expert, reputation) in self.r_combined_topics.zscan_iter(t):
-					if reputation > so_max: so_max = reputation
-					if reputation < so_min: so_min = reputation
+					if reputation > q_max: q_max = reputation
+					if reputation < q_min: q_min = reputation
 					q_experts.append([expert, reputation])
 				t = t.split(':')[1]
 				q_topic_docs.append(t)
