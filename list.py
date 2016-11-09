@@ -1080,7 +1080,7 @@ class PeerRank:
 
 	def get_twitter_rankings(self, query, include_so=False, include_q=False):
 		""" 
-			For a query, return top twitter experts, multi-threaded implementation
+			For a query, return top twitter experts, multi-process implementation
 			If include_so = True, include ranking score from matched stackoverflow account
 			If include_q = True, include ranking score from matched Quora account
 		"""
@@ -1088,30 +1088,35 @@ class PeerRank:
 		import threading
 		import multiprocessing as mp
 		
-		NUM_THREADS = 2 * mp.cpu_count()
-		qlock = threading.Lock()
-		count = Counter(start=0)
-		class RankWorker(BaseWorker):
+		NUM_PROCESS = mp.cpu_count()
+		tasks = mp.JoinableQueue()
+		manager = mp.Manager()
+		rankings = manager.list()
+		class Worker(mp.Process):
+			def __init__(self, task_queue, results, query_vector, listed_count_hash):
+				mp.Process.__init__(self)
+				self.task_queue = task_queue
+				self.results = results
+				self.query_vector = query_vector
+				self.listed_count_hash = listed_count_hash
+				self.pr = PeerRank()
+
 			def run(self):
-				# Acquire qlock
-				hasWork = True
-				while hasWork:
-					qlock.acquire()
-					try:
-						if self.data['counter'].value < len(self.users):
-							(topic_vector, user_id) = self.users[self.data['counter'].value]
-							self.data['counter'].increment()
-						else:
-							hasWork = False
-					finally:
-						qlock.release()
-					if hasWork:
+				proc_name = self.name
+				while True:
+					(topic_vector, user_id) = self.task_queue.get()
+					if topic_vector is None and user_id is None:
+						self.task_queue.task_done()
+						break
+					else:
 						try:
-							listed_count = self.data['listed_count_hash'][user_id]
+							listed_count = self.listed_count_hash[user_id]
 						except KeyError as e:
 							print("Error getting listed count for user %d, using default of 10" % (user_id,))
 							listed_count = 10
-						rankings.append((user_id, self.pr.rank_twitter_user(user_id, listed_count, self.data['query_vector'], topic_vector), 0))
+						self.task_queue.task_done()
+						self.results.append((user_id, self.pr.rank_twitter_user(user_id, listed_count, self.query_vector, topic_vector), 0))
+				return
 
 		try:
 			_a = self.sql
@@ -1152,19 +1157,23 @@ class PeerRank:
 				listed_count_hash[int(row[0])] = int(row[1])
 		print("Time taken to fetch listed count for all users: %.2f " % (time.time() - start))
 
-		# Multi-threading
-		threads = []
-		rankings = []
+		# Multi-processing
+		processes = []
 		start = time.time()
-		for i in range(0, NUM_THREADS):
-			thread = RankWorker(topic_vectors, query_vector=query_vector, counter=count, listed_count_hash=listed_count_hash)
-			threads.append(thread)
-			thread.start()
-		for t in threads:
-			t.join()
+		for i in range(0, NUM_PROCESS):
+			p = Worker(tasks, rankings, query_vector, listed_count_hash)
+			processes.append(p)
+		for p in processes:
+			p.start()
+		for task in topic_vectors:
+			tasks.put(task)
+		for i in range(0, NUM_PROCESS):
+			tasks.put((None, None)) # Poison pill
+		tasks.join()
 		print("Time taken to rank users: %.2f " % (time.time() - start))
 
 		start = time.time()
+		rankings = [x for x in rankings]
 		rankings.sort(key=lambda x: x[1], reverse=True)
 		print("Time taken to sort rankings: %.2f " % (time.time() - start))
 
