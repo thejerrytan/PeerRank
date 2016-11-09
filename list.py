@@ -805,7 +805,7 @@ class PeerRank:
 			return listed_count
 		raise(PeerRankError("Cannot find user in database"))
 
-	def batch_get_twitter_profile(self, user_rankings):
+	def batch_get_twitter_profile(self, user_rankings, verbose=False):
 		""" Batch fetch twitter profiles for all user_ids (user_ids, score, flag)"""
 		try:
 			_a = self.sql
@@ -843,22 +843,22 @@ class PeerRank:
 						user_profiles[user]['is_merged_stackoverflow'] = True
 						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'stackoverflow'))
 						stats['so_merged'] += 1
-						pprint.pprint(user_profiles[user])
+						if verbose: pprint.pprint(user_profiles[user])
 					elif flag == 2:
 						user_profiles[user]['is_added_stackoverflow'] = True
 						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'stackoverflow'))
 						stats['so_added'] += 1
-						pprint.pprint(user_profiles[user])
+						if verbose: pprint.pprint(user_profiles[user])
 					elif flag == 3:
 						user_profiles[user]['is_merged_quora'] = True
 						stats['q_merged'] += 1
 						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'quora'))
-						pprint.pprint(user_profiles[user])
+						if verbose: pprint.pprint(user_profiles[user])
 					elif flag == 4:
 						user_profiles[user]['is_added_quora'] = True
 						stats['q_added'] += 1
 						user_profiles[user].update(self.update_external_profile(user_profiles[user]['screen_name'], 'quora'))
-						pprint.pprint(user_profiles[user])
+						if verbose: pprint.pprint(user_profiles[user])
 					else:
 						print("Error user %d, flag %d" % (user, flag))
 				except KeyError as e:
@@ -889,22 +889,22 @@ class PeerRank:
 			(q_name, q_num_views) = self.r_q_experts.hmget("quora:expert:%s" % q_username, "q_name", "q_num_views")
 			if q_name is not None and q_num_views is not None:
 				try:
-					q_name = q_name.encode('utf-8', 'ignore')
-					q_name = q_name.decode('utf-8')
+					q_name = q_name.encode('utf-8', 'ignore').decode('utf-8')
+					q_profile = {
+						'q_name' : q_name,
+						'q_num_views' : q_num_views.encode('utf-8').decode('utf-8'),
+						'q_url' : u"https://www.quora.com/profile/%s" % ('-'.join(q_name.split(' ')))
+					}
+					return q_profile
 				except UnicodeDecodeError as e:
 					print e
 				except UnicodeEncodeError as e:
 					print e
-				q_profile = {
-					'q_name' : q_name,
-					'q_num_views' : q_num_views.encode('utf-8').decode('utf-8'),
-					'q_url' : u"https://www.quora.com/profile/%s" % ('-'.join(q_name.split(' ')))
-				}
-				return q_profile
+				finally:
+					return {}
 			else:
 				return {}
 		else:
-			pass
 			return {}
 
 	def infer_twitter_topics(self, user_id, close=False, verbose=False):
