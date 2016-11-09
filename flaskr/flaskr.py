@@ -1,7 +1,7 @@
 import os, pprint, json, sys, time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import mysql.connector
-from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash
+from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash, jsonify
 from list import PeerRank
 
 app = Flask(__name__)
@@ -33,3 +33,25 @@ def search():
 		'stats' : stats
 	}
 	return render_template('index.html', **context)
+
+@app.route('/search', methods=['POST'])
+def search_ajax():
+	start         = time.time()
+	query         = unicode(request.form.get('q'))
+	include_so    = True if request.form.get('include_so') is not None else False
+	include_quora = True if request.form.get('include_q') is not None else False
+	results       = pr.get_twitter_rankings(query, include_so=include_so, include_q=include_quora)
+	(user_profiles, stats) = pr.batch_get_twitter_profile(results)
+	time_taken    = time.time() - start
+	num_results   = len(results)
+	print(stats)
+	context = {
+		'query' : query,
+		'include_so' : include_so,
+		'include_q' : include_quora,
+		'time_taken' : time_taken,
+		'num_results' : num_results,
+		'results' : user_profiles,
+		'stats' : stats
+	}
+	return jsonify(**context)
