@@ -1086,8 +1086,9 @@ class PeerRank:
 		"""
 		from parallel import Counter, BaseWorker
 		import threading
+		import multiprocessing as mp
 		
-		NUM_THREADS = 8
+		NUM_THREADS = 2 * mp.cpu_count()
 		qlock = threading.Lock()
 		count = Counter(start=0)
 		class RankWorker(BaseWorker):
