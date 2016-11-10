@@ -1,5 +1,5 @@
-// var hostname = '104.196.149.230:5000'
-var hostname = 'http://localhost:5000'
+var hostname = 'http://104.196.149.230:5000'
+// var hostname = 'http://localhost:5000'
 Handlebars.registerHelper('ifEq', function(v1, v2, options) {
   if(v1 === v2) {
     return options.fn(this)
