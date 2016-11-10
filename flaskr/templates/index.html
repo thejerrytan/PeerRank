@@ -3,10 +3,11 @@
   <title>PeerRank</title>
   <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
   <link rel=stylesheet type=text/css href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel=stylesheet type=text/css href="{{ url_for('static', filename='pagination.css') }}">
   <script src="https://use.fontawesome.com/a9bfcaf5af.js"></script>
   <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
   <script src="{{ url_for('static', filename='pagination.js') }}"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.5/handlebars.runtime.amd.min.js"></script>
+  <script src="{{ url_for('static', filename='handlebars-v4.0.5.js') }}"></script>
 </head>
 <body>
   <div class="container-fluid">
@@ -18,7 +19,7 @@
     <div class="row" style="margin-top:60px">
       <div class="col-md-6 col-md-offset-3">
         <div class="well" id="index-container">
-          <form class="form-inline" action="/search" method="get">
+          <form class="form-inline" id="query-form" action="/search" method="get">
             <div class="form-group">
               <label class="sr-only" for="query">Topic</label>
               <input type="text" name="q" {% if query is defined %}value="{{query}}" {% endif %} class="form-control" id="query-input" placeholder="Enter a Short Query">
@@ -31,11 +32,11 @@
             </div>
             <div class="checkbox">
               <label title="Include Quora">
-                <input type="checkbox" title="Include Quora" name="include_q" id="include-so" {% if include_q %}checked{% endif %}> Include <i class="fa fa-quora" aria-hidden="true"></i>
+                <input type="checkbox" title="Include Quora" name="include_q" id="include-q" {% if include_q %}checked{% endif %}> Include <i class="fa fa-quora" aria-hidden="true"></i>
               </label>
             </div>
           </form>
-          <div class="results" id="results-container">
+          <div class="results" id="meta-container">
             {% if query %}
               <h3> Search results for: "{{ query }}"</h3>
               <p> {{ num_results }} returned in {{ "%.2f" |format(time_taken) }} s</p>
@@ -55,7 +56,9 @@
               </p>
               <hr/>
             {% endif %}
-            <!-- your results here !-->
+          </div>
+          <!-- your results here !-->
+          <div id="users-container">
             {% for user in results %}
               {% include 'expert.html' %}
             {% endfor %}
@@ -73,7 +76,7 @@
   <div class="twitter-expert">
     <div class="row">
       <div class="col-md-2">
-        <img data-user-score="{{ user.score }}" {{#if user.profile_image_url == "None" }} src="static/twitter-default-img.png" {{ else }} src="{{ user.profile_image_url }}"{{/if}} class="img-thumbnail">
+        <img data-user-score="{{ user.score }}" {{#ifEq user.profile_image_url "None" }} src="static/twitter-default-img.png" {{ else }} src="{{ user.profile_image_url }}"{{/ifEq}} class="img-thumbnail">
       </div>
       <div class="col-md-10">
         <p>
@@ -95,19 +98,41 @@
           <span class="label label-info">Merged <i class="fa fa-quora" aria-hidden="true"></i></span>
         {{/if}}
         </p>
-          {{#if user.is_added_stackoverflow or user.is_merged_stackoverflow}}
+          {{#ifOr user.is_added_stackoverflow user.is_merged_stackoverflow}}
+            <p>
+              <a href="{{ user.so_url }}" target="_blank">{{ user.so_display_name }}</a> - Reputation : <span class="badge">{{ user.so_reputation }}</span>
+            </p>
+          {{/ifOr}}
+      {{#ifOr user.is_added_quora user.is_merged_quora}}
         <p>
-          <a href="{{ user['so_url'] }}" target="_blank">{{ user['so_display_name'] }}</a> - Reputation : <span class="badge">{{ user['so_reputation'] }}</span>
+          <a href="{{ user.q_url }}" target="_blank"> Quora: {{ user.q_name }}</a> - Views : <span class="badge">{{ user.q_num_views }}</span>
         </p>
-      {{/if}}
-      {{#if user.is_added_quora or user.is_merged_quora}}
-        <p>
-          <a href="{{ user['q_url'] }}" target="_blank"> Quora: {{ user['q_name'] }}</a> - Views : <span class="badge">{{ user['q_num_views'] }}</span>
-        </p>
-      {{/if}}
+      {{/ifOr}}
       <p>{{ user.description }}</p>
     </div>
   </div>
 </div>
+</script>
+{% endraw %}
+
+{% raw %}
+<script type="text/template" id="template-meta-data">
+  <h3> Search results for: {{ query }}</h3>
+    <p> {{ num_results }} returned in {{time_taken}} s</p>
+    <p> 
+      {{#if stats.so_merged }}
+        {{ stats.so_merged }} merged from StackExchange,
+      {{/if}}
+      {{#if stats.so_added }}
+        {{ stats.so_added }} added from StackExchange,
+      {{/if}}
+      {{#if stats.q_merged }}
+        {{ stats.q_merged }} merged from Quora,
+      {{/if}}
+      {{#if stats.q_added}}
+        {{ stats.q_added }} added from Quora
+      {{/if }}
+    </p>
+    <hr/>
 </script>
 {% endraw %}

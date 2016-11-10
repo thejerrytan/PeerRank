@@ -20,3 +20,14 @@ h1.center {
 	margin-top: 5px;
 	margin-bottom: 5px;
 }
+
+#pagination-container {
+	margin-top: 10px;
+	margin-bottom: 10px;
+}
+
+.loading {
+	margin-top: 5px;
+	margin-bottom: 5px;
+	margin-left: 10px;
+}

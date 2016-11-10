@@ -6,7 +6,6 @@ from list import PeerRank
 
 app = Flask(__name__)
 app.config.from_object(__name__)
-pr = PeerRank()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -14,6 +13,7 @@ def index():
 
 @app.route('/search', methods=['GET'])
 def search():
+	pr = PeerRank()
 	start         = time.time()
 	query         = unicode(request.args.get('q'))
 	include_so    = True if request.args.get('include_so') is not None else False
@@ -23,6 +23,7 @@ def search():
 	time_taken    = time.time() - start
 	num_results   = len(results)
 	print(stats)
+	pr.close()
 	context = {
 		'query' : query,
 		'include_so' : include_so,
@@ -36,6 +37,7 @@ def search():
 
 @app.route('/search', methods=['POST'])
 def search_ajax():
+	pr = PeerRank()
 	start         = time.time()
 	query         = unicode(request.form.get('q'))
 	include_so    = True if request.form.get('include_so') is not None else False
@@ -45,6 +47,7 @@ def search_ajax():
 	time_taken    = time.time() - start
 	num_results   = len(results)
 	print(stats)
+	pr.close()
 	context = {
 		'query' : query,
 		'include_so' : include_so,
