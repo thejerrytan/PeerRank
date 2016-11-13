@@ -72,25 +72,31 @@ class Worker(threading.Thread):
 
 	def insert_list(self, user, screen_name):
 		# Insert list
+		print("Inserting lists for user %d : %s" % (user, screen_name))
+		max_page = 2000 / 20
+		curr_page = 0
+		cursor = -1
 		try:
-			print("Inserting lists for user %d : %s" % (user, screen_name))
-			for l in tweepy.Cursor(self.api.lists_memberships, id=user).items(2000):
+			while cursor is not None and curr_page < max_page:
 				try:
-					if type(l.name) is not unicode or type(l.description) is not unicode: print("[Error] strings not unicode")
-					self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
-					self.cnx.commit()
-					self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
-					self.cnx.commit()
+					(lists, paginate) = self.api.lists_memberships(id=user, cursor=cursor)
+					for l in lists:
+						self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
+						self.cnx.commit()
+						self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
+						self.cnx.commit()
 				except tweepy.RateLimitError as e:
 					print e
 					time.sleep(5)
 					self.km.invalidate_key()
 					self.km.change_key()
 					self.api = authenticate(self.km.get_key())
-					self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
-					self.cnx.commit()
-					self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
-					self.cnx.commit()
+					(lists, paginate) = self.api.lists_memberships(id=user, cursor=cursor)
+					for l in lists:
+						self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
+						self.cnx.commit()
+						self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
+						self.cnx.commit()
 				except TweepError as e:
 					print(e)
 					if type(e.message) is list and e.message[0]['code'] == 32: # Could not authenticate
@@ -98,16 +104,22 @@ class Worker(threading.Thread):
 						self.km.invalidate_key()
 						self.km.change_key()
 						self.api = authenticate(self.km.get_key())
-						self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
-						self.cnx.commit()
-						self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
-						self.cnx.commit()
+						(lists, paginate) = self.api.lists_memberships(id=user, cursor=cursor)
+						for l in lists:
+							self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
+							self.cnx.commit()
+							self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
+							self.cnx.commit()
+				finally:
+					curr_page += 1
+					cursor = paginate[1]
+					print(curr_page, cursor)
 			count.increment()
 			if count.value % 100 == 0:
 				print ("Progress : %d" % int(count.value))
 				with open('twitter_get_lists_for_user.txt', 'w') as f:
 					f.write(str(count.value))
-				f.close()
+				f.close()	
 		except Exception as e:
 			print(e)
 			self.cnx.close()
@@ -121,7 +133,7 @@ def main():
 	print("Starting with: %d " % SO_FAR)
 	try:
 		cursor.execute("SET SESSION net_read_timeout = 3600")
-		cursor.execute("SELECT user_id, screen_name FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
+		cursor.execute("SELECT user_id, screen_name FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (100, SO_FAR))
 		for row in cursor:
 			users.append((int(row[0]), row[1]))
 		for t in range(0, NO_THREADS):
