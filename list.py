@@ -1305,6 +1305,25 @@ class PeerRank:
 		if verbose: print("Time taken to rank user %d : %.2f" % (user_id, (time.time() - start)))
 		return ranking_score
 
+	def add_twitter_account(self, screen_name):
+		""" Manually add individual Twitter accounts to our DB"""
+		try:
+			_a = self.sql
+		except AttributeError as e:
+			self.__init_sql_connection()
+		try:
+			u = self.api.get_user(screen_name=screen_name)
+			data = (u.id, u.listed_count, u.name, u.screen_name, u.verified, u.profile_image_url, u.description, u.id, u.listed_count, u.name, u.screen_name, u.verified, u.profile_image_url, u.description)
+			stmt = "INSERT INTO `test`.`new_temp` (user_id, listed_count, name, screen_name, verified, profile_image_url, description) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE user_id=%s, listed_count=%s, name=%s, screen_name=%s, verified=%s, profile_image_url=%s, description=%s"
+			try:
+				self.cursor.execute(stmt, data)
+				self.sql.commit()
+				print("Successfully inserted <%d : %s>, listed: %d" % (u.id, u.screen_name, u.listed_count))
+			except Exception as e:
+				print "[MYSQL ERROR] " + str(e)
+		except Exception as e:
+			print e
+
 class PeerRankError(Exception):
 	def __init__(self, value):
 		self.value = value
