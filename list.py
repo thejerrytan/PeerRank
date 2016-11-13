@@ -1296,7 +1296,7 @@ class PeerRank:
 		topic_list = [topic for topic, freq in topic_vector.iteritems()]
 		ranked_docs = cover_density_ranking(query, topic_list)
 		for rank, (index, score) in enumerate(ranked_docs):
-			sim_score += topic_vector[topic_list[index]]
+			sim_score += topic_vector[topic_list[index]] * score
 		sim_score = sim_score * 1.0 / total
 		if listed_count <= 0:
 			print("Error! Listed count is %d for %d" % (listed_count, user_id))
