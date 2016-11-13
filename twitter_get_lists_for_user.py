@@ -118,7 +118,6 @@ def main():
 	try:
 		cursor.execute("SET SESSION net_read_timeout = 3600")
 		cursor.execute("SELECT user_id FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
-		cnx.close()
 		for row in cursor:
 			users.append(int(row[0]))
 		for t in range(0, NO_THREADS):
@@ -133,6 +132,7 @@ def main():
 		sys.exit(0)
 	except Exception as e:
 		print e
+	finally:
 		cnx.close()
 
 if __name__ == "__main__":
