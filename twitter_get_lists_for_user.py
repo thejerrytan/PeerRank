@@ -133,7 +133,7 @@ def main():
 	print("Starting with: %d " % SO_FAR)
 	try:
 		cursor.execute("SET SESSION net_read_timeout = 3600")
-		cursor.execute("SELECT user_id, screen_name FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (100, SO_FAR))
+		cursor.execute("SELECT user_id, screen_name FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
 		for row in cursor:
 			users.append((int(row[0]), row[1]))
 		for t in range(0, NO_THREADS):
