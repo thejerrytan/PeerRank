@@ -112,7 +112,7 @@ class Worker(threading.Thread):
 			print(e)
 			self.cnx.close()
 			(self.cursor, self.cnx) = reconnect()
-			self.insert_list(user)
+			self.insert_list(user, screen_name)
 
 def main():
 	"""For users with listed_count > 10, get lists they are members of and insert into DB"""
