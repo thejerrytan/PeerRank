@@ -62,48 +62,52 @@ class Worker(threading.Thread):
 			try:
 				size = len(self.users)
 				if size > 0:
-					user = self.users.popleft()
+					(user, screen_name) = self.users.popleft()
 				else:
 					self.cnx.close()
 					hasWork = False
 			finally:
 				qlock.release()
-			if hasWork: self.insert_list(user)
+			if hasWork: self.insert_list(user, screen_name)
 
-	def insert_list(self, user):
+	def insert_list(self, user, screen_name):
 		# Insert list
 		try:
+			print("Inserting lists for user %d : %s" % (user, screen_name))
 			for l in tweepy.Cursor(self.api.lists_memberships, id=user).items(2000):
-				if type(l.name) is not unicode or type(l.description) is not unicode: print("[Error] strings not unicode")
-				self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
-				self.cnx.commit()
-				self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
-				self.cnx.commit()
+				try:
+					if type(l.name) is not unicode or type(l.description) is not unicode: print("[Error] strings not unicode")
+					self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
+					self.cnx.commit()
+					self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
+					self.cnx.commit()
+				except tweepy.RateLimitError as e:
+					print e
+					time.sleep(5)
+					self.km.invalidate_key()
+					self.km.change_key()
+					self.api = authenticate(self.km.get_key())
+					self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
+					self.cnx.commit()
+					self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
+					self.cnx.commit()
+				except TweepError as e:
+					print(e)
+					if type(e.message) is list and e.message[0]['code'] == 32: # Could not authenticate
+						time.sleep(5)
+						self.km.invalidate_key()
+						self.km.change_key()
+						self.api = authenticate(self.km.get_key())
+						self.cursor.execute("INSERT INTO test.lists (list_id, url, name, description, subscriber_count, member_count, created_at) VALUES(%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE url=%s", (l.id, l.uri, l.name, l.description, l.subscriber_count, l.member_count, l.created_at, l.uri))
+						self.cnx.commit()
+						self.cursor.execute("INSERT INTO test.member_of (user_id, list_id) VALUES(%s, %s) ON DUPLICATE KEY UPDATE user_id=%s", (user, l.id, user))
+						self.cnx.commit()
 			count.increment()
 			if count.value % 100 == 0:
 				print ("Progress : %d" % int(count.value))
 				with open('twitter_get_lists_for_user.txt', 'w') as f:
 					f.write(str(count.value))
 				f.close()
-		except tweepy.RateLimitError as e:
-			print e
-			time.sleep(5)
-			self.km.invalidate_key()
-			self.km.change_key()
-			self.api = authenticate(self.km.get_key())
-			self.cnx.close()
-			(self.cursor, self.cnx) = reconnect()
-			self.insert_list(user)
-		except TweepError as e:
-			print(e)
-			if type(e.message) is list and e.message[0]['code'] == 32: # Could not authenticate
-				time.sleep(5)
-				self.km.invalidate_key()
-				self.km.change_key()
-				self.api = authenticate(self.km.get_key())
-				self.cnx.close()
-				(self.cursor, self.cnx) = reconnect()
-				self.insert_list(user)
 		except Exception as e:
 			print(e)
 			self.cnx.close()
@@ -117,9 +121,9 @@ def main():
 	print("Starting with: %d " % SO_FAR)
 	try:
 		cursor.execute("SET SESSION net_read_timeout = 3600")
-		cursor.execute("SELECT user_id FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
+		cursor.execute("SELECT user_id, screen_name FROM `test`.`new_temp` WHERE listed_count > 10 LIMIT %d OFFSET %d" % (NUM_USERS, SO_FAR))
 		for row in cursor:
-			users.append(int(row[0]))
+			users.append((int(row[0]), row[1]))
 		for t in range(0, NO_THREADS):
 			t = Worker(users)
 			threads.append(t)

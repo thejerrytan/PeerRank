@@ -269,5 +269,9 @@ verified_experts = [
 	'LIFE',
 	'Flickr',
 	'instagram',
-	'CreativeReview'
+	'CreativeReview',
+	'garyvee',
+	'MarthaStewart',
+	'tonyrobbins',
+	'mcuban'
 ]
