@@ -16,6 +16,7 @@ class QuoranSpider(scrapy.Spider):
 
     def parse(self, response):
         t = TopicLoader(item=QuoraTopic(), response=response)
+        print(t.item.fields)
         t.add_xpath('q_name', '//span[contains(@class,"TopicNameSpan")]/text()')
         t.add_xpath('q_description', '//div[contains(@class, "TruncatedTopicWiki")]/span[contains(@class,"rendered_qtext")]/text()')
         t.add_xpath('q_num_questions', '//a[contains(@class, "TopicQuestionsStatsRow")]/strong/text()')
